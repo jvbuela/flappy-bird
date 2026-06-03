@@ -22,6 +22,18 @@
       align-items: center;
       gap: 12px;
     }
+    #stage {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .side {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .side button { width: 110px; text-align: center; }
     canvas {
       background: #4ec0ca;
       border: 3px solid #553847;
@@ -72,7 +84,15 @@
 </head>
 <body>
   <div id="wrap">
-    <canvas id="game" width="400" height="600"></canvas>
+    <div id="stage">
+      <div id="diffPicker" class="picker side">
+        <div class="picker-label">Difficulty</div>
+        <button data-mode="easy">😌 Easy</button>
+        <button data-mode="medium">🙂 Medium</button>
+        <button data-mode="hard">😤 Hard</button>
+      </div>
+      <canvas id="game" width="400" height="600"></canvas>
+    </div>
     <div id="hint">Click, tap, or press Space to flap</div>
     <div class="picker-label">Background</div>
     <div id="bgPicker" class="picker">
@@ -108,6 +128,15 @@
     const BACKGROUNDS = ["mountains", "clouds", "ocean"];
     let bg = localStorage.getItem("flappyBg");
     if (!BACKGROUNDS.includes(bg)) bg = "mountains";
+
+    // --- Difficulty modes: scale the whole score-driven ramp ---
+    const MODES = {
+      easy:   { gap: 190, gapDrop: 1.0, minGap: 140, speed: 1.9, speedRamp: 0.030, maxSpeed: 2.9, spacing: 250, spacingDrop: 1.5, minSpacing: 200, moveAt: 14, wideAt: 22 },
+      medium: { gap: 160, gapDrop: 1.8, minGap: 115, speed: 2.2, speedRamp: 0.045, maxSpeed: 3.4, spacing: 220, spacingDrop: 2.2, minSpacing: 170, moveAt: 8,  wideAt: 14 },
+      hard:   { gap: 140, gapDrop: 2.2, minGap: 100, speed: 2.6, speedRamp: 0.060, maxSpeed: 3.9, spacing: 195, spacingDrop: 2.6, minSpacing: 150, moveAt: 4,  wideAt: 9  },
+    };
+    let mode = MODES[localStorage.getItem("flappyMode")] ? localStorage.getItem("flappyMode") : "medium";
+    function M() { return MODES[mode]; }
 
     // --- Players ---
     // To add a player: drop an image in the players/ folder and add a line here.
@@ -147,12 +176,13 @@
       return a + Math.random() * (b - a);
     }
 
-    // Difficulty values derived from the current score (moderate, all capped).
+    // Difficulty values derived from the current score and selected mode (capped).
     function difficulty() {
+      const m = M();
       return {
-        speed: Math.min(3.4, PIPE_SPEED + score * 0.045),
-        gap: Math.max(115, PIPE_GAP - score * 1.8),
-        spacing: Math.max(170, PIPE_SPACING - score * 2.2),
+        speed: Math.min(m.maxSpeed, m.speed + score * m.speedRamp),
+        gap: Math.max(m.minGap, m.gap - score * m.gapDrop),
+        spacing: Math.max(m.minSpacing, m.spacing - score * m.spacingDrop),
         level: 1 + Math.floor(score / 5),
       };
     }
@@ -165,15 +195,16 @@
       const d = difficulty();
       const margin = 55;
 
-      // Wide pipes unlock at score 14, with a rising chance.
+      // Wide pipes unlock at the mode's threshold, with a rising chance.
+      const m = M();
       let w = PIPE_W;
-      if (score >= 14 && Math.random() < Math.min(0.5, (score - 14) * 0.04)) {
+      if (score >= m.wideAt && Math.random() < Math.min(0.5, (score - m.wideAt) * 0.04)) {
         w = 90;
       }
 
-      // Moving pipes unlock at score 8, with a rising chance.
+      // Moving pipes unlock at the mode's threshold, with a rising chance.
       let amp = 0, mspeed = 0;
-      if (score >= 8 && Math.random() < Math.min(0.6, (score - 8) * 0.04)) {
+      if (score >= m.moveAt && Math.random() < Math.min(0.6, (score - m.moveAt) * 0.04)) {
         amp = rand(28, 64);
         mspeed = rand(0.02, 0.04);
       }
@@ -247,8 +278,8 @@
       pipes = pipes.filter((p) => p.x + p.w > 0);
 
       // Announce newly unlocked challenges / level-ups via a brief banner.
-      if (!unlocked.moving && score >= 8) { unlocked.moving = true; showBanner("↕ Moving pipes!"); }
-      else if (!unlocked.wide && score >= 14) { unlocked.wide = true; showBanner("▭ Wide pipes!"); }
+      if (!unlocked.moving && score >= M().moveAt) { unlocked.moving = true; showBanner("↕ Moving pipes!"); }
+      else if (!unlocked.wide && score >= M().wideAt) { unlocked.wide = true; showBanner("▭ Wide pipes!"); }
       else if (unlocked.lastLevel !== d.level && score > 0) {
         if (unlocked.lastLevel !== undefined) showBanner("⚡ Level " + d.level + " — faster & tighter!");
         unlocked.lastLevel = d.level;
@@ -532,7 +563,7 @@
         ctx.fillRect(0, 0, W, H);
         centerText("FLAPPY BIRD", H / 2 - 40, 40, "#fff");
         centerText("Click / Tap / Space to start", H / 2 + 4, 18, "#fff");
-        centerText("Best: " + best, H / 2 + 36, 16, "#fff");
+        centerText("Mode: " + mode[0].toUpperCase() + mode.slice(1) + "  ·  Best: " + best, H / 2 + 36, 16, "#fff");
         ctx.restore();
       } else if (state === STATE.OVER) {
         ctx.save();
@@ -597,6 +628,21 @@
       playerButtons.forEach((b, i) => b.classList.toggle("active", PLAYERS[i] === player));
     }
     updatePlayerButtons();
+
+    // --- Difficulty picker --- (changing mode starts a fresh game)
+    const diffButtons = document.querySelectorAll("#diffPicker button");
+    function updateDiffButtons() {
+      diffButtons.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    }
+    diffButtons.forEach((b) => {
+      b.addEventListener("click", () => {
+        mode = b.dataset.mode;
+        localStorage.setItem("flappyMode", mode);
+        updateDiffButtons();
+        reset();
+      });
+    });
+    updateDiffButtons();
 
     reset();
     loop();
