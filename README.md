@@ -64,4 +64,4 @@ serve the folder (e.g. `npx serve`) or use the Vercel URL.
 
 Hosted on Vercel as a static site. Any push to `main` auto-redeploys.
 
-**Live demo:** _add your Vercel URL here after the first deploy_
+**Live demo:** https://flappy-bird-ni-mark.vercel.app/

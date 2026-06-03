@@ -3,6 +3,7 @@
 A complete record of this project: what it is, how it's built, every feature, the
 architecture, how to run/deploy it, and the full history of changes.
 
+- **Live demo:** https://flappy-bird-ni-mark.vercel.app/
 - **Repository:** https://github.com/jvbuela/flappy-bird (public)
 - **Hosting:** Vercel (static site; every push to `main` auto-redeploys)
 - **Owner:** jvbuela
@@ -147,10 +148,10 @@ script (built-in `zlib` only) that:
 banner reads **"PLAY FLAPPY BIRD / WITH ROC NETWORK & FRIENDS"** with the
 `mlacu` and `jkdgu` photos.
 
-> **Important for previews to show the image:** Facebook/Messenger want an
-> **absolute** `og:image` URL. Set `og:image`/`twitter:image` to
-> `https://<your-vercel-domain>/og-image.png` once the live domain is known, and
-> re-scrape with the Facebook Sharing Debugger.
+The `og:image`/`og:url` are set to **absolute** URLs on
+`https://flappy-bird-ni-mark.vercel.app/` (Facebook/Messenger require absolute
+image URLs). After changing the banner, **re-scrape** the link in the Facebook
+Sharing Debugger so cached previews refresh.
 
 ### 4.9 Online multiplayer ("ghost race")
 - **🌐 Multiplayer** button → lobby modal: enter a name, **Create room** (gets a
