@@ -141,8 +141,9 @@ load.
   yellow body with a white belly, a single feathered wing, a big eye, and a
   two-tone orange beak.
 - A **single animated wing** (`drawWing`, hinged at the shoulder) flaps up on
-  each tap and settles (`bird.wing` decays); it's drawn over both the Classic
-  body and photo skins so personalized birds also read as birds.
+  each tap and settles (`bird.wing` decays). On the Classic body it's drawn on
+  top; on photo skins it's drawn **behind** the face (offset to peek past the
+  circle edge) so personalized birds read as birds without covering the face.
 - Graceful fallback: a missing/broken image silently reverts to the Classic
   bird (`p.ok` tracks load success). Saved as `flappyPlayer`.
 - **To add a player:** drop an image in `players/` and add a line to `PLAYERS`
@@ -367,6 +368,7 @@ There's no automated test suite. Each change was checked by:
 | `9b3d3ca` | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
 | `8ef1782` | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
 | _next_ | Center the canvas with the controls (grid gutters); redesign the bird to a real Flappy look (single wing, belly, beak) incl. photo skins; add a 🌙 night/dark mode (starry scene + dark page theme) |
+| _next_ | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
 
 ---
 

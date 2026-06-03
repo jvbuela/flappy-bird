@@ -621,9 +621,9 @@
 
     // A single feathered wing on the bird's near side, hinged at the shoulder.
     // wing in [0..1]: 0 = resting (swept down/back), 1 = raised mid-flap.
-    function drawWing(wing) {
+    function drawWing(wing, ox = 0, oy = 0) {
       ctx.save();
-      ctx.translate(-3, 1);                 // shoulder, slightly behind/below centre
+      ctx.translate(-3 + ox, 1 + oy);       // shoulder, slightly behind/below centre
       ctx.rotate(-0.5 - wing * 1.2);        // sweeps upward as the bird flaps
       ctx.fillStyle = "#fff";
       ctx.strokeStyle = "#553847";
@@ -663,7 +663,9 @@
 
       const usePhoto = plr && plr.file && plr.ok && plr.img;
       if (usePhoto) {
-        // Photo skin: circle-cropped face, outline, then the bird wing on top.
+        // Photo skin: wing behind (peeks out past the edge so it never covers
+        // the face), then the circle-cropped face and outline on top.
+        drawWing(wing, -3, 8);
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
@@ -681,7 +683,6 @@
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.stroke();
-        drawWing(wing);
       } else {
         // Classic drawn bird (fallback / default): oval body, belly, wing, eye, beak.
         ctx.fillStyle = "#f7c531";
