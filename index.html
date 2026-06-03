@@ -295,15 +295,15 @@
     const H = canvas.height;
 
     // --- Tunables ---
-    const GRAVITY = 0.39;
-    const FLAP = -7.5;
+    const GRAVITY = 0.29;
+    const FLAP = -5.25;
     const PIPE_W = 60;
     const PIPE_GAP = 160;
     const PIPE_SPACING = 220;   // horizontal distance between pipe pairs
     const PIPE_SPEED = 2.2;
     const GROUND_H = 90;
     const BIRD_R = 14;
-    const MAX_FALL = 9;         // terminal velocity — caps the plummet for a predictable arc
+    const MAX_FALL = 6;         // terminal velocity — caps the plummet for a predictable arc
 
     const STATE = { READY: 0, PLAYING: 1, OVER: 2 };
 
@@ -511,7 +511,7 @@
       bird.v += GRAVITY;
       if (bird.v > MAX_FALL) bird.v = MAX_FALL;
       bird.y += bird.v;
-      bird.rot = Math.max(-0.5, Math.min(1.2, bird.v / 12));
+      bird.rot = Math.max(-0.5, Math.min(1.2, bird.v / 8));
       bird.wing *= 0.85; // wings settle back down after a flap
 
       const d = difficulty();

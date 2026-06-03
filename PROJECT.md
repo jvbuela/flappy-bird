@@ -80,8 +80,11 @@ CodeTest2/
 - **Flap:** click, tap, or `Space` / `↑`.
 - Bird physics: gravity (`GRAVITY`), upward impulse on flap (`FLAP`), a
   terminal-velocity cap (`MAX_FALL`) so descents level off instead of
-  plummeting, and rotation that follows velocity. Tuned for a light,
-  controllable feel.
+  plummeting, and rotation that follows velocity. **Tuned to mirror the
+  original Flappy Bird:** the reference game's constants (30 fps, 288×512;
+  gravity 1, flap -9, terminal 10) are converted to this game's 60 fps and
+  600px height, preserving its hang time (~0.3s to apex) and jump-height-to-gap
+  ratio (~40%). Small, repeated taps — not one big hop per gap.
 - In multiplayer the bird **auto-flaps once at "GO"** (when the countdown hits
   zero) so a slightly late first tap doesn't drop you instantly. Solo has no
   countdown — it starts on your first flap from `READY`.
@@ -322,6 +325,7 @@ There's no automated test suite. Each change was checked by:
 | _next_ | Add social link preview (Open Graph/Twitter meta + generated `og-image.png` banner); document changes |
 | _next_ | Multiplayer: a dead bird drops and slides off-screen (broadcast `state.x`) instead of resting in the shared lane |
 | _next_ | Lighter bird feel: softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" so a late first tap doesn't drop you |
+| _next_ | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
 
 ---
 
