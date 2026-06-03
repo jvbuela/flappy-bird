@@ -383,7 +383,7 @@ There's no automated test suite. Each change was checked by:
 | `445f523` | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
-| _next_ | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
+| `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
 
 ---
 
