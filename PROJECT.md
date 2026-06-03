@@ -41,7 +41,7 @@ lines).
 | Hosting | Vercel (static) | Free, auto-deploy on push, HTTPS |
 | Source control | Git + GitHub (`gh` CLI) | Standard; Vercel imports from GitHub |
 | Realtime (multiplayer) | **Supabase Realtime** (broadcast channels) | Server-relayed over WebSocket → works across networks (no WebRTC/NAT issues), free tier, one-time setup |
-| Persistence | `localStorage` | Best score, chosen background/player/difficulty/name |
+| Persistence | `localStorage` + Supabase | Local: chosen background/player/difficulty/name and a per-mode best cache. Global all-time best scores (per mode) live in a Supabase table |
 
 **Why Supabase over peer-to-peer (Trystero):** the players are on different
 networks. Peer-to-peer (WebRTC) can fail on strict/locked-down Wi-Fi without a
@@ -90,7 +90,11 @@ CodeTest2/
   countdown — it starts on your first flap from `READY`.
 - Pipes scroll right→left; pass through the gap to score. Hitting a pipe, the
   ground, or (clamped) the ceiling ends the run.
-- **Best score** saved in `localStorage` (`flappyBest`).
+- **Best score** is a **per-mode global all-time record** (the highest score
+  anyone has achieved on Easy/Medium/Hard), stored in Supabase and shown with
+  the holder's name on the READY/GAME OVER screens. A per-mode `localStorage`
+  cache (`flappyBest:<mode>`) is the offline/paused-project fallback and the old
+  single `flappyBest` value is migrated into the active mode on first load.
 - States: `READY` → `PLAYING` → `OVER` (`STATE` enum).
 
 ### 4.2 Progressive difficulty
@@ -225,6 +229,16 @@ it / works offline).
 `isHost`, `pipeHost`, `raceId`, `netSpeed`, `hostMode`, `code`, `name`, `alive`,
 `playerName`, `peers{}`, `countdown`, `results`.
 
+**Global best scores (Supabase DB, separate from realtime):** a `best_scores`
+table (`mode` PK, `score`, `name`, `updated_at`) holds the per-mode all-time
+record. The client reads all rows on load (`fetchBests`) to display, and writes
+through a `submit_best(p_mode, p_score, p_name)` `security definer` RPC that only
+raises the record (`recordBest` → `submitBest`). RLS allows reads only; the RPC
+is the sole write path (and is best-effort — failures fall back to the local
+`flappyBest:<mode>` cache, so solo/offline play is unaffected). The SQL to create
+the table + RPC is in the README. No anti-cheat — a client can submit a fake
+score, same caveat as the self-reported race state.
+
 **Known limitations:**
 - If the **host leaves mid-race**, pipe snapshots stop and that round can't
   continue (others return to the room). No host migration.
@@ -326,6 +340,7 @@ There's no automated test suite. Each change was checked by:
 | _next_ | Multiplayer: a dead bird drops and slides off-screen (broadcast `state.x`) instead of resting in the shared lane |
 | _next_ | Lighter bird feel: softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" so a late first tap doesn't drop you |
 | _next_ | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
+| _next_ | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
 
 ---
 

@@ -7,7 +7,9 @@ vanilla JavaScript. No dependencies, no build step.
 
 - **Flap:** click, tap, or press `Space` / `↑`
 - Pass between the pipes to score. Hitting a pipe or the ground ends the game.
-- Your best score is saved in the browser (`localStorage`).
+- Best scores are tracked **per difficulty as a global all-time record** (shared
+  across everyone, with the holder's name) when Supabase is set up; otherwise
+  they fall back to a per-device best saved in the browser (`localStorage`).
 - The game gets harder as you score: faster pipes, narrowing gaps, tighter
   spacing, plus **moving pipes** (score ≥ 8) and **wide pipes** (score ≥ 14).
 - Pick a **Background** (mountains / clouds / ocean) and a **Player** under the
@@ -39,8 +41,35 @@ without any peer-to-peer/firewall issues). Setup is one time and free:
    const SUPABASE_URL = "https://xxxx.supabase.co";
    const SUPABASE_ANON_KEY = "eyJ...";
    ```
-   (The anon key is meant to be public; we only use realtime broadcast — no
-   database tables, no private data.)
+   (The anon key is meant to be public — it only allows realtime broadcast and
+   the read/submit of best scores below, no private data.)
+4. **(Optional) Global all-time best scores.** To show a per-mode all-time best
+   shared across everyone, open the Supabase **SQL editor** and run:
+   ```sql
+   create table if not exists public.best_scores (
+     mode text primary key,
+     score integer not null default 0,
+     name text,
+     updated_at timestamptz not null default now()
+   );
+   alter table public.best_scores enable row level security;
+   grant select on public.best_scores to anon;
+   create policy "read best scores" on public.best_scores for select using (true);
+   insert into public.best_scores (mode, score) values ('easy',0),('medium',0),('hard',0)
+     on conflict (mode) do nothing;
+
+   create or replace function public.submit_best(p_mode text, p_score integer, p_name text)
+   returns table(mode text, score integer, name text)
+   language plpgsql security definer as $$
+   begin
+     update public.best_scores b set score = p_score, name = p_name, updated_at = now()
+       where b.mode = p_mode and p_score > b.score;
+     return query select b.mode, b.score, b.name from public.best_scores b where b.mode = p_mode;
+   end; $$;
+   grant execute on function public.submit_best(text, integer, text) to anon;
+   ```
+   Without this table the game still works — it just falls back to a per-device
+   best stored in the browser.
 
 To play: click **🌐 Multiplayer**, enter a name, **Create room** (or **Join**
 with a code), then the host clicks **Start race**.

@@ -307,8 +307,7 @@
 
     const STATE = { READY: 0, PLAYING: 1, OVER: 2 };
 
-    let state, bird, pipes, score, best, frame, unlocked, banner, course;
-    best = Number(localStorage.getItem("flappyBest") || 0);
+    let state, bird, pipes, score, frame, unlocked, banner, course;
 
     const BACKGROUNDS = ["mountains", "clouds", "ocean"];
     let bg = localStorage.getItem("flappyBg");
@@ -322,6 +321,19 @@
     };
     let mode = MODES[localStorage.getItem("flappyMode")] ? localStorage.getItem("flappyMode") : "medium";
     function M() { return MODES[mode]; }
+
+    // --- Per-mode best scores: a local cache (offline) overlaid with the global
+    // all-time record from Supabase. Display shows the global best for `mode`. ---
+    const bests = {};         // mode -> best-known score (local cache ∪ global)
+    const bestHolders = {};   // mode -> name of who holds it (from Supabase)
+    for (const m in MODES) bests[m] = Number(localStorage.getItem("flappyBest:" + m) || 0);
+    const legacyBest = Number(localStorage.getItem("flappyBest") || 0);
+    if (legacyBest > bests[mode]) bests[mode] = legacyBest;   // migrate the old single value
+    function nameForScore() { return (localStorage.getItem("flappyName") || player.name || "anon").slice(0, 14); }
+    function recordBest(m, v) {
+      if (v > (bests[m] || 0)) { bests[m] = v; localStorage.setItem("flappyBest:" + m, String(v)); }
+      if (SUPA_READY && v > 0) submitBest(m, v);   // push to the global all-time record
+    }
 
     // --- Players ---
     // To add a player: drop an image in the players/ folder and add a line here.
@@ -478,10 +490,7 @@
 
     function gameOver() {
       state = STATE.OVER;
-      if (score > best) {
-        best = score;
-        localStorage.setItem("flappyBest", String(best));
-      }
+      recordBest(mode, score);
     }
 
     // Online: my bird crashed — become a spectator but keep the race running.
@@ -870,7 +879,7 @@
         ctx.fillRect(0, 0, W, H);
         centerText("FLAPPY BIRD", H / 2 - 40, 40, "#fff");
         centerText("Click / Tap / Space to start", H / 2 + 4, 18, "#fff");
-        centerText("Mode: " + mode[0].toUpperCase() + mode.slice(1) + "  ·  Best: " + best, H / 2 + 36, 16, "#fff");
+        centerText("Mode: " + mode[0].toUpperCase() + mode.slice(1) + "  ·  Best: " + bests[mode] + (bestHolders[mode] ? " (" + bestHolders[mode] + ")" : ""), H / 2 + 36, 16, "#fff");
         ctx.restore();
       } else if (state === STATE.OVER) {
         ctx.save();
@@ -878,7 +887,7 @@
         ctx.fillRect(0, 0, W, H);
         centerText("GAME OVER", H / 2 - 50, 40, "#fff");
         centerText("Score: " + score, H / 2, 24, "#fff");
-        centerText("Best: " + best, H / 2 + 32, 20, "#fff");
+        centerText("Best: " + bests[mode] + (bestHolders[mode] ? " by " + bestHolders[mode] : ""), H / 2 + 32, 20, "#fff");
         centerText("Click / Tap / Space to restart", H / 2 + 70, 16, "#fff");
         ctx.restore();
       }
@@ -1033,6 +1042,25 @@
       return supaClient;
     }
 
+    // ----- global all-time best scores (Supabase; best-effort, never blocks play) -----
+    async function fetchBests() {
+      try {
+        const supa = await getSupa();
+        const { data } = await supa.from("best_scores").select("mode,score,name");
+        if (data) for (const r of data) {
+          if (r.score > (bests[r.mode] || 0)) bests[r.mode] = r.score;
+          bestHolders[r.mode] = r.name || null;
+        }
+      } catch (e) {}
+    }
+    async function submitBest(m, v) {
+      try {
+        const supa = await getSupa();
+        const { data } = await supa.rpc("submit_best", { p_mode: m, p_score: v, p_name: nameForScore() });
+        if (data && data[0]) { bests[m] = data[0].score; bestHolders[m] = data[0].name; }
+      } catch (e) {}
+    }
+
     // ----- network senders (referenced by the game loop) -----
     function sendStateNow() {
       if (!mp.channel) return;
@@ -1096,7 +1124,7 @@
       mp.results = board;
       state = STATE.OVER;
       mp.pipeHost = false; // stop streaming pipes once the race is over
-      if (score > best) { best = score; localStorage.setItem("flappyBest", String(best)); }
+      recordBest(mode, score);
       showRoom(); // refresh panel state (Rematch/Leave) for when it's opened
     }
 
@@ -1289,6 +1317,7 @@
     // ==============================================================
 
     reset();
+    if (SUPA_READY) fetchBests();   // pull the global all-time bests (non-blocking)
     loop();
   </script>
 </body>
