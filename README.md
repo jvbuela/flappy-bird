@@ -17,6 +17,8 @@ vanilla JavaScript. No dependencies, no build step.
   canvas; both choices are remembered.
 - Tap **🌙 Night** for a dark/night mode — a starry night scene plus a dark page
   theme. It's remembered across visits (toggle back with ☀️ Day).
+- Tap **🔊 Sound** to toggle goofy sound effects (flap, score, a falling scream,
+  and race countdown beeps). On by default; remembered across visits.
 
 ## Choose your player
 

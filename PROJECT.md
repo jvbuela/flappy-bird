@@ -154,6 +154,15 @@ load.
 A **❓ How to play** button opens a modal explaining single-player and the full
 multiplayer flow, with tips. Closes via ✕, "Got it!", or backdrop click.
 
+### 4.6b Sound effects
+Cartoon SFX **synthesized in-code with the Web Audio API** (oscillators + gain
+envelopes — no audio files, no licensing): a goofy whoosh on **flap**, ascending
+**score** blips, a wobbly descending **fall/crash** scream (vibrato LFO), and
+3-2-1-**GO** **countdown** beeps in multiplayer. A **🔊 Sound** button toggles
+mute (saved as `flappySound`, default on); `getAudio()` lazily creates/resumes
+the `AudioContext` on the first gesture. Sounds play for the **local player
+only** (peers are silent). Helpers: `sfxFlap/sfxScore/sfxFall/sfxBeep` + `blip`.
+
 ### 4.7 Responsive layout
 The page scales to any resolution and **scrolls instead of clipping** when the
 content is taller than the viewport (previously `overflow:hidden` cut things off
@@ -371,6 +380,7 @@ There's no automated test suite. Each change was checked by:
 | `b653923` | Center the canvas with the controls (grid gutters); redesign the bird to a real Flappy look (single wing, belly, beak) incl. photo skins; add a 🌙 night/dark mode (starry scene + dark page theme) |
 | `445f523` | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
+| _next_ | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 
 ---
 
