@@ -90,11 +90,17 @@ CodeTest2/
   countdown — it starts on your first flap from `READY`.
 - Pipes scroll right→left; pass through the gap to score. Hitting a pipe, the
   ground, or (clamped) the ceiling ends the run.
-- **Best score** is a **per-mode global all-time record** (the highest score
-  anyone has achieved on Easy/Medium/Hard), stored in Supabase and shown with
-  the holder's name on the READY/GAME OVER screens. A per-mode `localStorage`
-  cache (`flappyBest:<mode>`) is the offline/paused-project fallback and the old
-  single `flappyBest` value is migrated into the active mode on first load.
+- **Best scores** are a **per-mode global top-3 leaderboard** — the
+  "🏆 Flappy Best! — ROC Spotlight Award / Beat me if you can!" podium shown on
+  the READY/GAME OVER screens (`drawLeaderboard`). Supabase stores one row per
+  player per mode (their personal best); the client fetches and ranks the top 3
+  for the current difficulty (🥇🥈🥉). A per-mode `localStorage` cache
+  (`flappyBest:<mode>`) is the offline/paused-project fallback (shows the local
+  best as a single entry), and the old single `flappyBest` value is migrated into
+  the active mode on first load.
+- **Player name** is set via a "Your name" field on the main page (for solo) or
+  the multiplayer lobby — both bound to the shared `flappyName` key — and is what
+  appears on the leaderboard (falls back to the player name / `anon` if blank).
 - States: `READY` → `PLAYING` → `OVER` (`STATE` enum).
 
 ### 4.2 Progressive difficulty
@@ -230,14 +236,15 @@ it / works offline).
 `playerName`, `peers{}`, `countdown`, `results`.
 
 **Global best scores (Supabase DB, separate from realtime):** a `best_scores`
-table (`mode` PK, `score`, `name`, `updated_at`) holds the per-mode all-time
-record. The client reads all rows on load (`fetchBests`) to display, and writes
-through a `submit_best(p_mode, p_score, p_name)` `security definer` RPC that only
-raises the record (`recordBest` → `submitBest`). RLS allows reads only; the RPC
-is the sole write path (and is best-effort — failures fall back to the local
-`flappyBest:<mode>` cache, so solo/offline play is unaffected). The SQL to create
-the table + RPC is in the README. No anti-cheat — a client can submit a fake
-score, same caveat as the self-reported race state.
+table with composite PK `(mode, name)` — one row per player per mode — and
+columns `score`, `updated_at`. The client reads all rows on load (`fetchBests`),
+groups by mode and keeps the top 3 for the podium. Writes go through a
+`submit_best(p_mode, p_score, p_name)` `security definer` RPC that **upserts**,
+keeping the player's higher score (`recordBest` → `submitBest`, which refetches
+afterward). RLS allows reads only; the RPC is the sole write path (best-effort —
+failures fall back to the local `flappyBest:<mode>` cache, so solo/offline play is
+unaffected). The SQL to create the table + RPC is in the README. No anti-cheat —
+a client can submit a fake score, same caveat as the self-reported race state.
 
 **Known limitations:**
 - If the **host leaves mid-race**, pipe snapshots stop and that round can't
@@ -341,6 +348,7 @@ There's no automated test suite. Each change was checked by:
 | _next_ | Lighter bird feel: softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" so a late first tap doesn't drop you |
 | _next_ | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
 | _next_ | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
+| _next_ | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
 
 ---
 

@@ -154,6 +154,7 @@
       margin-top: 4px;
     }
     #mpCode { text-transform: uppercase; width: 90px; }
+    #playerName { width: 160px; text-align: center; }
     #lobbyCard button, #helpCard button {
       font: inherit;
       font-weight: 600;
@@ -191,6 +192,8 @@
       <canvas id="game" width="400" height="600"></canvas>
     </div>
     <div id="hint">Click, tap, or press Space to flap</div>
+    <div class="picker-label">Your name</div>
+    <div class="picker"><input id="playerName" maxlength="14" placeholder="your name" /></div>
     <div class="picker-label">Background</div>
     <div id="bgPicker" class="picker">
       <button data-bg="mountains">⛰️ Mountains</button>
@@ -326,6 +329,7 @@
     // all-time record from Supabase. Display shows the global best for `mode`. ---
     const bests = {};         // mode -> best-known score (local cache ∪ global)
     const bestHolders = {};   // mode -> name of who holds it (from Supabase)
+    const leaders = {};       // mode -> [{name, score}] top 3 (from Supabase)
     for (const m in MODES) bests[m] = Number(localStorage.getItem("flappyBest:" + m) || 0);
     const legacyBest = Number(localStorage.getItem("flappyBest") || 0);
     if (legacyBest > bests[mode]) bests[mode] = legacyBest;   // migrate the old single value
@@ -877,20 +881,35 @@
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,0.15)";
         ctx.fillRect(0, 0, W, H);
-        centerText("FLAPPY BIRD", H / 2 - 40, 40, "#fff");
-        centerText("Click / Tap / Space to start", H / 2 + 4, 18, "#fff");
-        centerText("Mode: " + mode[0].toUpperCase() + mode.slice(1) + "  ·  Best: " + bests[mode] + (bestHolders[mode] ? " (" + bestHolders[mode] + ")" : ""), H / 2 + 36, 16, "#fff");
+        centerText("FLAPPY BIRD", H / 2 - 150, 40, "#fff");
+        centerText("Mode: " + mode[0].toUpperCase() + mode.slice(1), H / 2 - 118, 16, "#fff");
+        drawLeaderboard(H / 2 - 80);
+        centerText("Click / Tap / Space to start", H / 2 + 130, 16, "#fff");
         ctx.restore();
       } else if (state === STATE.OVER) {
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,0.4)";
         ctx.fillRect(0, 0, W, H);
-        centerText("GAME OVER", H / 2 - 50, 40, "#fff");
-        centerText("Score: " + score, H / 2, 24, "#fff");
-        centerText("Best: " + bests[mode] + (bestHolders[mode] ? " by " + bestHolders[mode] : ""), H / 2 + 32, 20, "#fff");
-        centerText("Click / Tap / Space to restart", H / 2 + 70, 16, "#fff");
+        centerText("GAME OVER", H / 2 - 150, 40, "#fff");
+        centerText("Score: " + score, H / 2 - 112, 24, "#fff");
+        drawLeaderboard(H / 2 - 80);
+        centerText("Click / Tap / Space to restart", H / 2 + 130, 16, "#fff");
         ctx.restore();
       }
+    }
+
+    // The "Flappy Best! — ROC Spotlight Award" top-3 podium for the current mode.
+    function drawLeaderboard(cy) {
+      const list = (leaders[mode] && leaders[mode].length)
+        ? leaders[mode]
+        : (bests[mode] > 0 ? [{ name: bestHolders[mode] || nameForScore(), score: bests[mode] }] : []);
+      centerText("🏆 Flappy Best! 🏆", cy, 24, "#ffd84d");
+      centerText("ROC Spotlight Award", cy + 24, 15, "#ffd84d");
+      centerText("Beat me if you can!", cy + 44, 14, "#fff");
+      const medals = ["🥇", "🥈", "🥉"];
+      if (!list.length) { centerText("No scores yet — be the first!", cy + 74, 15, "#fff"); return; }
+      for (let i = 0; i < list.length; i++)
+        centerText(medals[i] + "  " + list[i].name + "   " + list[i].score, cy + 74 + i * 26, 18, "#fff");
     }
 
     // Online HUD: live scoreboard, pre-race countdown, and results.
@@ -1046,18 +1065,28 @@
     async function fetchBests() {
       try {
         const supa = await getSupa();
-        const { data } = await supa.from("best_scores").select("mode,score,name");
-        if (data) for (const r of data) {
-          if (r.score > (bests[r.mode] || 0)) bests[r.mode] = r.score;
-          bestHolders[r.mode] = r.name || null;
+        const { data } = await supa.from("best_scores")
+          .select("mode,name,score")
+          .order("score", { ascending: false })
+          .order("updated_at", { ascending: true });   // ties: earlier achiever ranks first
+        if (data) {
+          const g = {};
+          for (const r of data) (g[r.mode] = g[r.mode] || []).push({ name: r.name, score: r.score });
+          for (const m in MODES) {
+            leaders[m] = (g[m] || []).slice(0, 3);
+            if (leaders[m][0]) {
+              bests[m] = Math.max(bests[m] || 0, leaders[m][0].score);
+              bestHolders[m] = leaders[m][0].name;
+            }
+          }
         }
       } catch (e) {}
     }
     async function submitBest(m, v) {
       try {
         const supa = await getSupa();
-        const { data } = await supa.rpc("submit_best", { p_mode: m, p_score: v, p_name: nameForScore() });
-        if (data && data[0]) { bests[m] = data[0].score; bestHolders[m] = data[0].name; }
+        await supa.rpc("submit_best", { p_mode: m, p_score: v, p_name: nameForScore() });
+        await fetchBests();   // refresh the board with the new standings
       } catch (e) {}
     }
 
@@ -1255,6 +1284,16 @@
 
     mpName.value = localStorage.getItem("flappyName") || player.name;
 
+    // Main-page name field: lets solo players set the name used on the leaderboard.
+    // Kept in sync with the lobby's name field via the shared flappyName key.
+    const playerNameInput = document.getElementById("playerName");
+    playerNameInput.value = localStorage.getItem("flappyName") || "";
+    playerNameInput.addEventListener("input", () => {
+      const v = playerNameInput.value.trim();
+      localStorage.setItem("flappyName", v);
+      mpName.value = v;
+    });
+
     function openLobby() {
       if (!SUPA_READY) mpStatus.textContent = "Add your Supabase URL + anon key in index.html to enable online play.";
       lobby.hidden = false;
@@ -1296,7 +1335,10 @@
     document.getElementById("helpClose").addEventListener("click", () => { help.hidden = true; });
     document.getElementById("helpOk").addEventListener("click", () => { help.hidden = true; });
     help.addEventListener("click", (e) => { if (e.target === help) help.hidden = true; });
-    mpName.addEventListener("input", () => localStorage.setItem("flappyName", mpName.value.trim()));
+    mpName.addEventListener("input", () => {
+      localStorage.setItem("flappyName", mpName.value.trim());
+      playerNameInput.value = mpName.value.trim();
+    });
     mpCreate.addEventListener("click", () => enterRoom(randomCode(), true));
     mpJoinBtn.addEventListener("click", () => {
       const c = (mpCode.value || "").trim().toUpperCase();
