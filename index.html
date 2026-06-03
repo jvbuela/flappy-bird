@@ -80,8 +80,8 @@
       background: #f2d22e;
       box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
     }
-    /* Multiplayer lobby modal */
-    #lobby {
+    /* Modal (multiplayer lobby + help) */
+    #lobby, #help {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.55);
@@ -90,8 +90,8 @@
       justify-content: center;
       z-index: 10;
     }
-    #lobby[hidden] { display: none; }
-    #lobbyCard {
+    #lobby[hidden], #help[hidden] { display: none; }
+    #lobbyCard, #helpCard {
       position: relative;
       width: min(92vw, 360px);
       background: #fff8e6;
@@ -101,7 +101,15 @@
       color: #553847;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     }
-    #lobbyCard h2 { margin: 0 0 8px; font-size: 20px; }
+    #helpCard { width: min(92vw, 400px); max-height: 85vh; overflow-y: auto; }
+    #lobbyCard h2, #helpCard h2 { margin: 0 0 8px; font-size: 20px; }
+    #helpCard h3 { margin: 14px 0 4px; font-size: 15px; }
+    #helpCard p, #helpCard li { font-size: 13px; line-height: 1.5; }
+    #helpCard ol, #helpCard ul { margin: 4px 0; padding-left: 20px; }
+    #helpCard .tag {
+      display: inline-block; background: #f2d22e; border: 1px solid #553847;
+      border-radius: 6px; padding: 0 5px; font-weight: 600; font-size: 12px;
+    }
     #lobbyCard label { display: block; font-size: 13px; margin: 8px 0; }
     #lobbyCard input {
       font: inherit;
@@ -113,7 +121,7 @@
       margin-top: 4px;
     }
     #mpCode { text-transform: uppercase; width: 90px; }
-    #lobbyCard button {
+    #lobbyCard button, #helpCard button {
       font: inherit;
       font-weight: 600;
       padding: 8px 14px;
@@ -123,9 +131,9 @@
       color: #553847;
       cursor: pointer;
     }
-    #lobbyCard button:hover { filter: brightness(1.05); }
+    #lobbyCard button:hover, #helpCard button:hover { filter: brightness(1.05); }
     #lobbyCard button:disabled { opacity: 0.5; cursor: default; }
-    #mpClose {
+    #mpClose, #helpClose {
       position: absolute; top: 8px; right: 8px;
       background: #fff !important; padding: 2px 9px !important; font-size: 14px;
     }
@@ -160,6 +168,57 @@
     <div id="playerPicker" class="picker"></div>
     <div class="picker" style="margin-top:6px">
       <button id="mpOpen">🌐 Multiplayer</button>
+      <button id="helpOpen">❓ How to play</button>
+    </div>
+  </div>
+
+  <!-- How-to-play / instructions modal -->
+  <div id="help" hidden>
+    <div id="helpCard">
+      <button id="helpClose" title="Close">✕</button>
+      <h2>❓ How to play</h2>
+
+      <h3>🐦 Single player</h3>
+      <ul>
+        <li><b>Flap:</b> click, tap, or press <span class="tag">Space</span> / <span class="tag">↑</span>.</li>
+        <li>Fly through the gaps — hitting a pipe or the ground ends the run.</li>
+        <li>It gets harder as you score: faster pipes, smaller gaps, then
+          <b>moving</b> and <b>wide</b> pipes.</li>
+        <li>Pick a <b>Difficulty</b>, <b>Background</b>, and <b>Player</b> (use a
+          photo as your bird) below the game.</li>
+      </ul>
+
+      <h3>🌐 Multiplayer (race your friends)</h3>
+      <p>Everyone flies the <b>same pipes</b> and sees each other live. Last bird
+        flying wins (ties go to the higher score).</p>
+      <ol>
+        <li>Each player opens the game on their own device (same
+          <b>Vercel link</b>) and picks their <b>Player</b> bird.</li>
+        <li>Tap <span class="tag">🌐 Multiplayer</span> and type a name.</li>
+        <li><b>One person</b> taps <b>Create room</b> and shares the
+          <b>room code</b> (the <b>copy</b> button helps).</li>
+        <li>Everyone else taps <b>Join</b>, enters that code, and waits in the
+          room — you'll see each other in the player list.</li>
+        <li>The <b>host</b> (who created the room) picks the <b>Difficulty</b>
+          and taps <b>Start race</b>. A 3‑2‑1 countdown begins.</li>
+        <li>Flap to survive! Others appear as faded <b>ghost birds</b> with name
+          tags; the <b>scoreboard</b> (top-right) shows everyone's score.</li>
+        <li>When the race ends, the host can tap <b>Rematch</b>, or anyone can
+          <b>Leave</b>.</li>
+      </ol>
+
+      <h3>💡 Tips</h3>
+      <ul>
+        <li>Use the live <b>Vercel link</b> (not a downloaded file) so online play
+          can connect.</li>
+        <li>Works best with friends on normal home/phone internet. Very locked-down
+          office/school Wi‑Fi can sometimes block it.</li>
+        <li>The host's <b>Difficulty</b> applies to everyone in the race.</li>
+      </ul>
+
+      <div class="mp-row">
+        <button id="helpOk">Got it!</button>
+      </div>
     </div>
   </div>
 
@@ -1104,6 +1163,13 @@
 
     mpOpen.addEventListener("click", openLobby);
     mpClose.addEventListener("click", closeLobby);
+
+    // Help / instructions modal
+    const help = document.getElementById("help");
+    document.getElementById("helpOpen").addEventListener("click", () => { help.hidden = false; });
+    document.getElementById("helpClose").addEventListener("click", () => { help.hidden = true; });
+    document.getElementById("helpOk").addEventListener("click", () => { help.hidden = true; });
+    help.addEventListener("click", (e) => { if (e.target === help) help.hidden = true; });
     mpName.addEventListener("input", () => localStorage.setItem("flappyName", mpName.value.trim()));
     mpCreate.addEventListener("click", () => enterRoom(randomCode(), true));
     mpJoinBtn.addEventListener("click", () => {
