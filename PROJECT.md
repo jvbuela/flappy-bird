@@ -169,11 +169,13 @@ content is taller than the viewport (previously `overflow:hidden` cut things off
 and zoom was disabled). The canvas sizes itself with
 `width: min(400px, 92vw, 52dvh)` + `aspect-ratio: 2/3` (fits both width and
 height, never stretched). `#stage` is a 3-column grid (`1fr auto 1fr`) so the
-canvas stays **page-centered** (aligned with the control rows below) while the
-side Difficulty panel sits in the left gutter. On small screens
-(`@media max-width:640px`) the stage switches to a column — the Difficulty panel
-stacks into a row above the canvas — and modals scroll internally. Pinch-zoom is
-re-enabled.
+canvas stays **page-centered** while it's flanked by two side panels: the
+**Difficulty** picker in the left gutter (`.side`) and the **action buttons**
+(🌐 Multiplayer / ❓ Help / 🌙 Night / 🔊 Sound) in the right gutter
+(`.side.side-right`). Background, Player, and Your name sit below the canvas. On
+small screens (`@media max-width:640px`) the stage switches to a column — the
+side panels become centered rows (Difficulty above, actions below the canvas) —
+and modals scroll internally. Pinch-zoom is re-enabled.
 
 ### 4.8 Social link preview (Open Graph)
 When the link is shared (Messenger, Facebook, Twitter/X, Discord, etc.) it shows
@@ -381,6 +383,7 @@ There's no automated test suite. Each change was checked by:
 | `445f523` | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
+| _next_ | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
 
 ---
 

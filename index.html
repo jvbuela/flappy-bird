@@ -61,6 +61,8 @@
       justify-self: end;  /* hug the canvas from the left gutter */
     }
     .side button { width: 110px; text-align: center; }
+    .side-right { justify-self: start; }   /* hug the canvas from the right gutter */
+    .side-right button { width: 140px; }   /* fit the longer action labels */
     canvas {
       background: #4ec0ca;
       border: 3px solid #553847;
@@ -203,6 +205,12 @@
         <button data-mode="hard">😤 Hard</button>
       </div>
       <canvas id="game" width="400" height="600"></canvas>
+      <div id="actions" class="picker side side-right">
+        <button id="mpOpen">🌐 Multiplayer</button>
+        <button id="helpOpen">❓ How to play</button>
+        <button id="themeToggle">🌙 Night</button>
+        <button id="soundToggle">🔊 Sound</button>
+      </div>
     </div>
     <div id="hint">Click, tap, or press Space to flap</div>
     <div class="picker-label">Your name</div>
@@ -215,12 +223,6 @@
     </div>
     <div class="picker-label">Player</div>
     <div id="playerPicker" class="picker"></div>
-    <div class="picker" style="margin-top:6px">
-      <button id="mpOpen">🌐 Multiplayer</button>
-      <button id="helpOpen">❓ How to play</button>
-      <button id="themeToggle">🌙 Night</button>
-      <button id="soundToggle">🔊 Sound</button>
-    </div>
   </div>
 
   <!-- How-to-play / instructions modal -->
