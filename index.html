@@ -37,12 +37,38 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
       user-select: none;
     }
+    #bgPicker {
+      display: flex;
+      gap: 8px;
+    }
+    #bgPicker button {
+      font: inherit;
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 2px solid #553847;
+      border-radius: 999px;
+      background: #fff;
+      color: #553847;
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.15s ease;
+    }
+    #bgPicker button:hover { background: #ffe9a8; }
+    #bgPicker button:active { transform: translateY(1px); }
+    #bgPicker button.active {
+      background: #f2d22e;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
+    }
   </style>
 </head>
 <body>
   <div id="wrap">
     <canvas id="game" width="400" height="600"></canvas>
     <div id="hint">Click, tap, or press Space to flap</div>
+    <div id="bgPicker">
+      <button data-bg="mountains">⛰️ Mountains</button>
+      <button data-bg="clouds">☁️ Clouds</button>
+      <button data-bg="ocean">🌊 Ocean</button>
+    </div>
   </div>
 
   <script>
@@ -65,6 +91,10 @@
 
     let state, bird, pipes, score, best, frame;
     best = Number(localStorage.getItem("flappyBest") || 0);
+
+    const BACKGROUNDS = ["mountains", "clouds", "ocean"];
+    let bg = localStorage.getItem("flappyBg");
+    if (!BACKGROUNDS.includes(bg)) bg = "mountains";
 
     function reset() {
       state = STATE.READY;
@@ -217,6 +247,102 @@
       ctx.fillRect(0, H - GROUND_H + 14, W, 4);
     }
 
+    function skyGradient(top, bottom) {
+      const g = ctx.createLinearGradient(0, 0, 0, H - GROUND_H);
+      g.addColorStop(0, top);
+      g.addColorStop(1, bottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H - GROUND_H);
+    }
+
+    function drawCloud(x, y, s) {
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath();
+      ctx.arc(x, y, 18 * s, 0, Math.PI * 2);
+      ctx.arc(x + 20 * s, y - 8 * s, 22 * s, 0, Math.PI * 2);
+      ctx.arc(x + 44 * s, y, 18 * s, 0, Math.PI * 2);
+      ctx.arc(x + 22 * s, y + 6 * s, 20 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function bgMountains() {
+      skyGradient("#7ec8e3", "#cdeefb");
+      // sun
+      ctx.fillStyle = "rgba(255,241,150,0.9)";
+      ctx.beginPath();
+      ctx.arc(W - 70, 80, 34, 0, Math.PI * 2);
+      ctx.fill();
+      const base = H - GROUND_H;
+      // back range
+      ctx.fillStyle = "#9aa7c7";
+      const back = [[-20, 320], [80, 200], [180, 290], [300, 190], [420, 300]];
+      ctx.beginPath();
+      ctx.moveTo(-20, base);
+      for (const [x, y] of back) ctx.lineTo(x, y);
+      ctx.lineTo(420, base);
+      ctx.closePath();
+      ctx.fill();
+      // front range
+      ctx.fillStyle = "#6d7fa8";
+      const front = [[-20, 420], [120, 280], [260, 400], [400, 300], [440, 360]];
+      ctx.beginPath();
+      ctx.moveTo(-20, base);
+      for (const [x, y] of front) ctx.lineTo(x, y);
+      ctx.lineTo(440, base);
+      ctx.closePath();
+      ctx.fill();
+      // snow caps
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(120, 280); ctx.lineTo(135, 300); ctx.lineTo(105, 300); ctx.closePath();
+      ctx.moveTo(400, 300); ctx.lineTo(415, 320); ctx.lineTo(385, 320); ctx.closePath();
+      ctx.fill();
+    }
+
+    function bgClouds() {
+      skyGradient("#4aa3df", "#a9dcf5");
+      drawCloud(60, 120, 1.1);
+      drawCloud(230, 90, 1.4);
+      drawCloud(150, 230, 0.9);
+      drawCloud(300, 200, 1.1);
+      drawCloud(40, 330, 1.2);
+    }
+
+    function bgOcean() {
+      skyGradient("#6fc6e0", "#bdeeff");
+      const base = H - GROUND_H;
+      // water band above the ground
+      const horizon = base - 120;
+      const g = ctx.createLinearGradient(0, horizon, 0, base);
+      g.addColorStop(0, "#1b6ca8");
+      g.addColorStop(1, "#0f4c75");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, horizon, W, base - horizon);
+      // sun glow
+      ctx.fillStyle = "rgba(255,247,200,0.85)";
+      ctx.beginPath();
+      ctx.arc(80, 90, 30, 0, Math.PI * 2);
+      ctx.fill();
+      // wave highlights
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const y = horizon + 24 + i * 26;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 20) {
+          const yy = y + Math.sin((x + frame * 1.5 + i * 30) / 22) * 3;
+          if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+        }
+        ctx.stroke();
+      }
+    }
+
+    function drawBackground() {
+      if (bg === "clouds") bgClouds();
+      else if (bg === "ocean") bgOcean();
+      else bgMountains();
+    }
+
     function centerText(text, y, size, color) {
       ctx.fillStyle = color;
       ctx.font = "bold " + size + "px 'Segoe UI', sans-serif";
@@ -225,7 +351,7 @@
     }
 
     function draw() {
-      ctx.clearRect(0, 0, W, H);
+      drawBackground();
 
       for (const p of pipes) drawPipe(p);
       drawGround();
@@ -277,6 +403,20 @@
         flap();
       }
     });
+
+    // --- Background picker ---
+    const bgButtons = document.querySelectorAll("#bgPicker button");
+    function updateBgButtons() {
+      bgButtons.forEach((b) => b.classList.toggle("active", b.dataset.bg === bg));
+    }
+    bgButtons.forEach((b) => {
+      b.addEventListener("click", () => {
+        bg = b.dataset.bg;
+        localStorage.setItem("flappyBg", bg);
+        updateBgButtons();
+      });
+    });
+    updateBgButtons();
 
     reset();
     loop();
