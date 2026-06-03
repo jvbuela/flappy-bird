@@ -15,6 +15,8 @@ vanilla JavaScript. No dependencies, no build step.
   spacing, plus **moving pipes** (score ≥ 8) and **wide pipes** (score ≥ 14).
 - Pick a **Background** (mountains / clouds / ocean) and a **Player** under the
   canvas; both choices are remembered.
+- Tap **🌙 Night** for a dark/night mode — a starry night scene plus a dark page
+  theme. It's remembered across visits (toggle back with ☀️ Day).
 
 ## Choose your player
 

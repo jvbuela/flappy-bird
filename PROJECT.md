@@ -118,10 +118,18 @@ A vertical picker beside the canvas. Each mode scales the whole ramp via the
 `spacing`, `spacingDrop`, `minSpacing`, `moveAt`, `wideAt`). Saved as
 `flappyMode`. In multiplayer the **host's** mode applies to everyone.
 
-### 4.4 Backgrounds
+### 4.4 Backgrounds & night mode
 Picker for **mountains / clouds / ocean**, each drawn with canvas primitives
 (layered mountains + snow caps + sun; fluffy clouds; animated ocean waves).
 Saved as `flappyBg`.
+
+A **🌙 Night** toggle (saved as `flappyNight`) turns on a combined dark theme:
+in-canvas it overrides the background with a starry night scene (`bgNight` — dark
+sky gradient, fixed star field `NIGHT_STARS`, glowing moon, mountain silhouette)
+and dims the ground; on the page it adds `body.dark`, darkening the chrome
+(background, buttons, modals, inputs) and updating the `theme-color` meta. The
+button label flips 🌙 Night ↔ ☀️ Day; `applyTheme()` applies the saved state on
+load.
 
 ### 4.5 Players (photo birds + wings)
 - Driven by the `PLAYERS` array: `{ name, file }` entries. `"Classic"`
@@ -129,7 +137,12 @@ Saved as `flappyBg`.
 - Photos are **circle-cropped** with a focal zoom (`drawCreature` → `cover`
   scale × `zoom`, anchored at `focusX`/`focusY`, default ~face-centered).
   Per-player `zoom`/`focusX`/`focusY` overrides are supported.
-- Two **animated wings** flap up on each tap and settle (`bird.wing` decays).
+- The **Classic** bird is drawn to look like the original Flappy Bird: an oval
+  yellow body with a white belly, a single feathered wing, a big eye, and a
+  two-tone orange beak.
+- A **single animated wing** (`drawWing`, hinged at the shoulder) flaps up on
+  each tap and settles (`bird.wing` decays); it's drawn over both the Classic
+  body and photo skins so personalized birds also read as birds.
 - Graceful fallback: a missing/broken image silently reverts to the Classic
   bird (`p.ok` tracks load success). Saved as `flappyPlayer`.
 - **To add a player:** drop an image in `players/` and add a line to `PLAYERS`
@@ -144,9 +157,12 @@ The page scales to any resolution and **scrolls instead of clipping** when the
 content is taller than the viewport (previously `overflow:hidden` cut things off
 and zoom was disabled). The canvas sizes itself with
 `width: min(400px, 92vw, 52dvh)` + `aspect-ratio: 2/3` (fits both width and
-height, never stretched). On small screens (`@media max-width:560px`) the side
-Difficulty panel stacks into a row above the canvas, and modals scroll
-internally. Pinch-zoom is re-enabled.
+height, never stretched). `#stage` is a 3-column grid (`1fr auto 1fr`) so the
+canvas stays **page-centered** (aligned with the control rows below) while the
+side Difficulty panel sits in the left gutter. On small screens
+(`@media max-width:640px`) the stage switches to a column — the Difficulty panel
+stacks into a row above the canvas — and modals scroll internally. Pinch-zoom is
+re-enabled.
 
 ### 4.8 Social link preview (Open Graph)
 When the link is shared (Messenger, Facebook, Twitter/X, Discord, etc.) it shows
@@ -350,6 +366,7 @@ There's no automated test suite. Each change was checked by:
 | `2ba14bc` | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
 | `9b3d3ca` | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
 | `8ef1782` | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
+| _next_ | Center the canvas with the controls (grid gutters); redesign the bird to a real Flappy look (single wing, belly, beak) incl. photo skins; add a 🌙 night/dark mode (starry scene + dark page theme) |
 
 ---
 

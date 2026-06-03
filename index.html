@@ -46,9 +46,11 @@
       max-width: 100%;
     }
     #stage {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;  /* symmetric gutters keep the canvas page-centered */
+      column-gap: 14px;
+      align-items: start;
+      width: 100%;
       max-width: 100%;
     }
     .side {
@@ -56,6 +58,7 @@
       align-items: stretch;
       gap: 6px;
       margin-top: 4px;
+      justify-self: end;  /* hug the canvas from the left gutter */
     }
     .side button { width: 110px; text-align: center; }
     canvas {
@@ -69,8 +72,8 @@
       height: auto;
       aspect-ratio: 2 / 3;
     }
-    @media (max-width: 560px) {
-      #stage { flex-direction: column; align-items: center; }
+    @media (max-width: 640px) {
+      #stage { display: flex; flex-direction: column; align-items: center; }
       .side { flex-direction: row; flex-wrap: wrap; justify-content: center; margin-top: 0; }
       .side button { width: auto; }
     }
@@ -111,6 +114,16 @@
       background: #f2d22e;
       box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
     }
+    /* Night / dark page theme (toggled via the 🌙 button → body.dark) */
+    body.dark { background: linear-gradient(#0b1026 0%, #0b1026 75%, #20232e 75%, #20232e 100%); }
+    body.dark canvas { background: #0b1026; }
+    body.dark .picker button { background: #2a3142; color: #e8eaf0; border-color: #0b1026; }
+    body.dark .picker button:hover { background: #39425a; }
+    body.dark .picker button.active { background: #f2d22e; color: #553847; }
+    body.dark #lobbyCard, body.dark #helpCard { background: #1c2230; color: #e8eaf0; border-color: #0b1026; }
+    body.dark #helpCard .tag { color: #553847; }
+    body.dark input { background: #2a3142; color: #e8eaf0; border-color: #0b1026; }
+    body.dark .mp-status { color: #ff8d80; }
     /* Modal (multiplayer lobby + help) */
     #lobby, #help {
       position: fixed;
@@ -205,6 +218,7 @@
     <div class="picker" style="margin-top:6px">
       <button id="mpOpen">🌐 Multiplayer</button>
       <button id="helpOpen">❓ How to play</button>
+      <button id="themeToggle">🌙 Night</button>
     </div>
   </div>
 
@@ -315,6 +329,13 @@
     const BACKGROUNDS = ["mountains", "clouds", "ocean"];
     let bg = localStorage.getItem("flappyBg");
     if (!BACKGROUNDS.includes(bg)) bg = "mountains";
+
+    // Night/dark mode: a starry night scene + dark page chrome, toggled with 🌙.
+    let night = localStorage.getItem("flappyNight") === "1";
+    // Fixed star field (generated once so stars don't flicker between frames).
+    const NIGHT_STARS = [];
+    for (let i = 0; i < 46; i++)
+      NIGHT_STARS.push([Math.random() * 400, Math.random() * 380, Math.random() * 1.3 + 0.4]);
 
     // --- Difficulty modes: scale the whole score-driven ramp ---
     const MODES = {
@@ -598,18 +619,23 @@
       }
     }
 
-    // One feathered wing, hinged at the shoulder. side = -1 (left) or +1 (right).
-    function drawWing(side, wing) {
-      const angle = side * (0.35 - wing * 1.0); // sweeps upward on a flap
+    // A single feathered wing on the bird's near side, hinged at the shoulder.
+    // wing in [0..1]: 0 = resting (swept down/back), 1 = raised mid-flap.
+    function drawWing(wing) {
       ctx.save();
-      ctx.translate(side * (BIRD_R - 3), -2);
-      ctx.rotate(angle);
+      ctx.translate(-3, 1);                 // shoulder, slightly behind/below centre
+      ctx.rotate(-0.5 - wing * 1.2);        // sweeps upward as the bird flaps
       ctx.fillStyle = "#fff";
       ctx.strokeStyle = "#553847";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(side * 9, 0, 12, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(-8, 0, 11, 6, 0, 0, Math.PI * 2);   // extends back from the shoulder
       ctx.fill();
+      ctx.stroke();
+      // feather crease
+      ctx.beginPath();
+      ctx.moveTo(-2, -1);
+      ctx.lineTo(-15, 0);
       ctx.stroke();
       ctx.restore();
     }
@@ -635,11 +661,9 @@
       ctx.translate(x, y);
       ctx.rotate(rot);
 
-      drawWing(-1, wing);
-      drawWing(1, wing);
-
       const usePhoto = plr && plr.file && plr.ok && plr.img;
       if (usePhoto) {
+        // Photo skin: circle-cropped face, outline, then the bird wing on top.
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
@@ -657,29 +681,51 @@
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.stroke();
+        drawWing(wing);
       } else {
-        // Classic drawn bird (fallback / default).
-        ctx.fillStyle = "#f2d22e";
+        // Classic drawn bird (fallback / default): oval body, belly, wing, eye, beak.
+        ctx.fillStyle = "#f7c531";
         ctx.strokeStyle = "#553847";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, BIRD_R + 1, BIRD_R, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#fff";
+        // white belly
+        ctx.fillStyle = "#fff7e6";
         ctx.beginPath();
-        ctx.arc(6, -5, 5, 0, Math.PI * 2);
+        ctx.ellipse(-1, 5, BIRD_R - 4, BIRD_R - 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // wing (over the body)
+        drawWing(wing);
+        // eye
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#553847";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(7, -5, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = "#000";
         ctx.beginPath();
-        ctx.arc(8, -5, 2, 0, Math.PI * 2);
+        ctx.arc(8.5, -5, 2.4, 0, Math.PI * 2);
         ctx.fill();
+        // two-tone beak
+        ctx.strokeStyle = "#553847";
+        ctx.lineWidth = 2;
         ctx.fillStyle = "#e8702a";
         ctx.beginPath();
-        ctx.moveTo(BIRD_R - 2, -2);
-        ctx.lineTo(BIRD_R + 8, 0);
-        ctx.lineTo(BIRD_R - 2, 4);
+        ctx.moveTo(BIRD_R - 3, -4);
+        ctx.lineTo(BIRD_R + 9, -1);
+        ctx.lineTo(BIRD_R - 3, 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#c85a1f";
+        ctx.beginPath();
+        ctx.moveTo(BIRD_R - 3, 1);
+        ctx.lineTo(BIRD_R + 9, -1);
+        ctx.lineTo(BIRD_R - 3, 5);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -726,14 +772,18 @@
     }
 
     function drawGround() {
-      ctx.fillStyle = "#ded895";
+      const dirt = night ? "#2e2a3a" : "#ded895";
+      const lip = night ? "#211e2c" : "#cbbd6f";
+      const grass = night ? "#2f6b3c" : "#5bbf4a";
+      const grassDark = night ? "#1f4a29" : "#3a7d2f";
+      ctx.fillStyle = dirt;
       ctx.fillRect(0, H - GROUND_H, W, GROUND_H);
-      ctx.fillStyle = "#cbbd6f";
+      ctx.fillStyle = lip;
       ctx.fillRect(0, H - GROUND_H, W, 6);
       // simple grass stripes
-      ctx.fillStyle = "#5bbf4a";
+      ctx.fillStyle = grass;
       ctx.fillRect(0, H - GROUND_H, W, 14);
-      ctx.fillStyle = "#3a7d2f";
+      ctx.fillStyle = grassDark;
       ctx.fillRect(0, H - GROUND_H + 14, W, 4);
     }
 
@@ -827,8 +877,38 @@
       }
     }
 
+    function bgNight() {
+      skyGradient("#0b1026", "#243b55");
+      // stars
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      for (const [sx, sy, sr] of NIGHT_STARS) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // moon (with a soft glow)
+      ctx.fillStyle = "rgba(245,243,208,0.25)";
+      ctx.beginPath(); ctx.arc(W - 72, 82, 40, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#f5f3d0";
+      ctx.beginPath(); ctx.arc(W - 72, 82, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#e6e3b8";
+      ctx.beginPath(); ctx.arc(W - 64, 78, 6, 0, Math.PI * 2);
+      ctx.arc(W - 80, 90, 4, 0, Math.PI * 2); ctx.fill();
+      // mountain silhouette
+      const base = H - GROUND_H;
+      ctx.fillStyle = "#161d2e";
+      const ridge = [[-20, 420], [120, 280], [260, 400], [400, 300], [440, 360]];
+      ctx.beginPath();
+      ctx.moveTo(-20, base);
+      for (const [x, y] of ridge) ctx.lineTo(x, y);
+      ctx.lineTo(440, base);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     function drawBackground() {
-      if (bg === "clouds") bgClouds();
+      if (night) bgNight();
+      else if (bg === "clouds") bgClouds();
       else if (bg === "ocean") bgOcean();
       else bgMountains();
     }
@@ -1335,6 +1415,21 @@
     document.getElementById("helpClose").addEventListener("click", () => { help.hidden = true; });
     document.getElementById("helpOk").addEventListener("click", () => { help.hidden = true; });
     help.addEventListener("click", (e) => { if (e.target === help) help.hidden = true; });
+
+    // Night / dark mode toggle.
+    const themeToggle = document.getElementById("themeToggle");
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    function applyTheme() {
+      document.body.classList.toggle("dark", night);
+      themeToggle.textContent = night ? "☀️ Day" : "🌙 Night";
+      if (themeColorMeta) themeColorMeta.content = night ? "#0b1026" : "#4ec0ca";
+    }
+    themeToggle.addEventListener("click", () => {
+      night = !night;
+      localStorage.setItem("flappyNight", night ? "1" : "0");
+      applyTheme();
+    });
+    applyTheme();
     mpName.addEventListener("input", () => {
       localStorage.setItem("flappyName", mpName.value.trim());
       playerNameInput.value = mpName.value.trim();
