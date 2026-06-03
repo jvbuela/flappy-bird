@@ -380,7 +380,7 @@ There's no automated test suite. Each change was checked by:
 | `b653923` | Center the canvas with the controls (grid gutters); redesign the bird to a real Flappy look (single wing, belly, beak) incl. photo skins; add a 🌙 night/dark mode (starry scene + dark page theme) |
 | `445f523` | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
-| _next_ | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
+| `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 
 ---
 
