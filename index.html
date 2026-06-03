@@ -189,8 +189,9 @@
       </ul>
 
       <h3>🌐 Multiplayer (race your friends)</h3>
-      <p>Everyone flies the <b>same pipes</b> and sees each other live. Last bird
-        flying wins (ties go to the higher score).</p>
+      <p>Everyone flies the <b>same pipes</b> and sees each other live. Keep
+        flying after others crash — the race runs until <b>everyone is out</b>,
+        and the <b>highest score wins</b>.</p>
       <ol>
         <li>Each player opens the game on their own device (same
           <b>Vercel link</b>) and picks their <b>Player</b> bird.</li>
@@ -326,28 +327,20 @@
       online: false,        // in a race right now
       inRoom: false,        // joined a lobby
       channel: null,
-      isHost: false,
-      hostId: null,
+      isHost: false,        // created the room (controls Start)
+      pipeHost: false,      // authoritative pipe generator for the current race
+      raceId: 0,            // identifies the current race (ignores stale messages)
+      netSpeed: 2.2,        // last scroll speed received from the host (clients)
+      hostMode: null,       // host's difficulty, shown to joiners in the lobby
       code: null,
       name: "",
+      alive: true,
       playerName: player.name,   // chosen bird (PLAYERS[].name)
       peers: {},            // id -> { name, playerName, y, rot, wing, alive, score, t, targetY }
-      seed: 0,
       countdown: 0,         // frames remaining before the race "go"
       results: null,        // array of standings when a race ends
     };
-
-    // Deterministic PRNG so every client builds the identical pipe course.
-    function mulberry32(a) {
-      return function () {
-        a |= 0; a = (a + 0x6D2B79F5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-    }
-    let rngFn = Math.random;        // solo uses Math.random; a race swaps in a seeded rng
-    function R() { return rngFn(); }
+    let pipeSeq = 0;        // incrementing pipe id (host), reset each race
 
     function findPlayer(name) { return PLAYERS.find((p) => p.name === name) || PLAYERS[0]; }
     // =========================================================================
@@ -364,11 +357,11 @@
     }
 
     function rand(a, b) {
-      return a + R() * (b - a);
+      return a + Math.random() * (b - a);
     }
 
     // How far into the difficulty ramp we are. Online uses a shared course index
-    // (so the curve matches for everyone); solo uses the personal score.
+    // (driven by the host) so the curve matches for everyone; solo uses score.
     function progress() { return mp.online ? course : score; }
 
     // Difficulty values derived from progress() and the selected mode (capped).
@@ -388,8 +381,8 @@
     }
 
     function spawnPipe() {
-      // The pipe's shape depends only on the course index (and the seeded RNG in
-      // online mode), so every client builds an identical sequence of pipes.
+      // Solo, or the host in a race, generates pipes. Online clients never call
+      // this — they receive the host's pipes over the network.
       const prog = progress();
       const d = diffFor(prog);
       const m = M();
@@ -397,13 +390,13 @@
 
       // Wide pipes unlock at the mode's threshold, with a rising chance.
       let w = PIPE_W;
-      if (prog >= m.wideAt && R() < Math.min(0.5, (prog - m.wideAt) * 0.04)) {
+      if (prog >= m.wideAt && Math.random() < Math.min(0.5, (prog - m.wideAt) * 0.04)) {
         w = 90;
       }
 
       // Moving pipes unlock at the mode's threshold, with a rising chance.
       let amp = 0, mspeed = 0;
-      if (prog >= m.moveAt && R() < Math.min(0.6, (prog - m.moveAt) * 0.04)) {
+      if (prog >= m.moveAt && Math.random() < Math.min(0.6, (prog - m.moveAt) * 0.04)) {
         amp = rand(28, 64);
         mspeed = rand(0.02, 0.04);
       }
@@ -411,9 +404,10 @@
       // Pick a base top that keeps the gap (plus mover travel) on the field.
       const lo = margin + amp;
       const hi = H - GROUND_H - d.gap - margin - amp;
-      const baseTop = lo + R() * Math.max(0, hi - lo);
+      const baseTop = lo + Math.random() * Math.max(0, hi - lo);
 
       pipes.push({
+        id: pipeSeq++,
         x: W,
         w: w,
         gap: d.gap,
@@ -421,7 +415,7 @@
         top: baseTop,
         amp: amp,
         mspeed: mspeed,
-        phase: R() * Math.PI * 2,
+        phase: Math.random() * Math.PI * 2,
         passed: false,
       });
       course++;   // advance the shared difficulty/course index
@@ -485,24 +479,30 @@
       bird.wing *= 0.85; // wings settle back down after a flap
 
       const d = difficulty();
+      const authority = !mp.online || mp.pipeHost; // solo, or the race's pipe host
 
-      // Spawn pipes based on the last pipe's position (spacing tightens).
-      if (pipes.length === 0 || pipes[pipes.length - 1].x < W - d.spacing) {
-        spawnPipe();
+      if (authority) {
+        // Generate + scroll the course (this client owns the pipes).
+        if (pipes.length === 0 || pipes[pipes.length - 1].x < W - d.spacing) {
+          spawnPipe();
+        }
+        for (const p of pipes) {
+          p.x -= d.speed;
+          if (p.amp > 0) p.top = p.baseTop + Math.sin(frame * p.mspeed + p.phase) * p.amp;
+        }
+        pipes = pipes.filter((p) => p.x + p.w > 0);
+      } else {
+        // Online client: scroll the host's pipes for smoothness; snapshots correct.
+        for (const p of pipes) p.x -= mp.netSpeed;
+        pipes = pipes.filter((p) => p.x + p.w > 0);
       }
 
-      for (const p of pipes) {
-        p.x -= d.speed;
-        // Moving pipes oscillate their gap vertically.
-        if (p.amp > 0) {
-          p.top = p.baseTop + Math.sin(frame * p.mspeed + p.phase) * p.amp;
-        }
-        if (meAlive && !p.passed && p.x + p.w < bird.x) {
-          p.passed = true;
-          score++;
+      // Scoring for my own bird (passing a pipe).
+      if (meAlive) {
+        for (const p of pipes) {
+          if (!p.passed && p.x + p.w < bird.x) { p.passed = true; score++; }
         }
       }
-      pipes = pipes.filter((p) => p.x + p.w > 0);
 
       // Announce newly unlocked challenges / level-ups via a brief banner.
       if (!unlocked.moving && prog >= M().moveAt) { unlocked.moving = true; showBanner("↕ Moving pipes!"); }
@@ -534,7 +534,7 @@
         bird.v = 0;
       }
 
-      // Online: smooth ghosts, broadcast my state, check for the race end.
+      // Online: smooth ghosts, broadcast my state/pipes, check for the race end.
       if (mp.online) {
         for (const id in mp.peers) {
           const pe = mp.peers[id];
@@ -543,6 +543,7 @@
           }
         }
         sendStateThrottled();
+        if (mp.pipeHost) sendPipesThrottled(d.speed);
         checkRaceEnd();
       }
     }
@@ -959,13 +960,24 @@
     }
     diffButtons.forEach((b) => {
       b.addEventListener("click", () => {
+        // In a room, only the host may change the (shared) difficulty.
+        if (mp.inRoom && !mp.isHost) return;
         mode = b.dataset.mode;
         localStorage.setItem("flappyMode", mode);
         updateDiffButtons();
-        reset();
+        if (mp.inRoom && mp.isHost && mp.channel) {
+          mp.channel.track({ id: myId, name: mp.name, playerName: mp.playerName, host: true, mode: mode });
+        } else {
+          reset();
+        }
       });
     });
     updateDiffButtons();
+    // Disable the Difficulty buttons for non-host players while in a room.
+    function updateDiffLock() {
+      const lock = mp.inRoom && !mp.isHost;
+      diffButtons.forEach((b) => { b.disabled = lock; b.style.opacity = lock ? 0.5 : ""; });
+    }
 
     // ===================== MULTIPLAYER WIRING =====================
     const COUNTDOWN = 120; // frames (~2s) before "go"
@@ -990,6 +1002,35 @@
     }
     function sendStateThrottled() { if (frame % 5 === 0) sendStateNow(); }
 
+    // Host streams the authoritative pipe positions to everyone.
+    function sendPipesNow(speed) {
+      if (!mp.channel) return;
+      mp.channel.send({ type: "broadcast", event: "pipes", payload: {
+        raceId: mp.raceId,
+        speed: Math.round(speed * 100) / 100,
+        course: course,
+        list: pipes.map((p) => ({ i: p.id, x: Math.round(p.x), w: p.w, g: p.gap, t: Math.round(p.top) })),
+      }});
+    }
+    function sendPipesThrottled(speed) { if (frame % 3 === 0) sendPipesNow(speed); }
+
+    // Client: adopt the host's pipes (reconcile by id so scoring/passing survive).
+    function onPipes(msg) {
+      if (!msg || msg.raceId !== mp.raceId || mp.pipeHost) return;
+      mp.netSpeed = msg.speed;
+      course = msg.course;
+      const byId = {};
+      for (const p of pipes) byId[p.id] = p;
+      const next = [];
+      for (const q of msg.list) {
+        let p = byId[q.i];
+        if (!p) p = { id: q.i, passed: q.x + q.w < bird.x }; // new pipe (don't retro-score)
+        p.x = q.x; p.w = q.w; p.gap = q.g; p.top = q.t;
+        next.push(p);
+      }
+      pipes = next;
+    }
+
     function checkRaceEnd() {
       if (state !== STATE.PLAYING) return;
       let parts = 1, aliveCount = mp.alive ? 1 : 0;
@@ -997,7 +1038,9 @@
         const pe = mp.peers[id];
         if (pe.alive !== undefined) { parts++; if (pe.alive) aliveCount++; }
       }
-      const ended = parts >= 2 ? aliveCount <= 1 : !mp.alive;
+      // With others present, the race runs until EVERYONE is out; solo-test ends
+      // when I'm out.
+      const ended = parts >= 2 ? aliveCount === 0 : !mp.alive;
       if (ended) endRace();
     }
 
@@ -1010,16 +1053,16 @@
       board.sort((a, b) => (b.score - a.score) || ((b.alive ? 1 : 0) - (a.alive ? 1 : 0)));
       mp.results = board;
       state = STATE.OVER;
+      mp.pipeHost = false; // stop streaming pipes once the race is over
       if (score > best) { best = score; localStorage.setItem("flappyBest", String(best)); }
-      lobby.hidden = false; // reopen the panel for rematch / leave
-      showRoom();
+      showRoom(); // refresh panel state (Rematch/Leave) for when it's opened
     }
 
     // ----- start / rematch -----
-    function startRace(seed, m) {
+    function beginRace(raceId, m, asHost) {
       mode = m; updateDiffButtons();
-      rngFn = mulberry32(seed >>> 0);
       reset();                 // clears pipes, course=0, state=READY
+      pipeSeq = 0;
       // fresh per-race peer fields (identity kept)
       for (const id in mp.peers) {
         const pe = mp.peers[id];
@@ -1027,9 +1070,11 @@
       }
       mp.online = true;
       mp.alive = true;
+      mp.pipeHost = asHost;     // the host owns/streams the pipe course
+      mp.raceId = raceId;
       mp.results = null;
       mp.countdown = COUNTDOWN;
-      state = STATE.PLAYING;   // countdown gate inside update() holds the start
+      state = STATE.PLAYING;    // countdown gate inside update() holds the start
       closeLobby();
     }
 
@@ -1044,20 +1089,23 @@
     }
     function onStart(p) {
       if (!p) return;
-      startRace(p.seed, p.mode);
+      beginRace(p.raceId, p.mode, false);
     }
     function onPresenceSync() {
       if (!mp.channel) return;
       const st = mp.channel.presenceState();
       const present = new Set();
+      let hostMode = null;
       for (const key in st) {
         const meta = st[key][0] || {};
+        if (meta.host) hostMode = meta.mode;
         if (meta.id && meta.id !== myId) {
           present.add(meta.id);
           const pe = mp.peers[meta.id] || (mp.peers[meta.id] = {});
           pe.name = meta.name; pe.playerName = meta.playerName;
         }
       }
+      mp.hostMode = hostMode;
       // drop peers that left
       for (const id in mp.peers) if (!present.has(id)) delete mp.peers[id];
       renderPlayers();
@@ -1080,12 +1128,14 @@
         });
         channel.on("broadcast", { event: "state" }, ({ payload }) => onState(payload));
         channel.on("broadcast", { event: "start" }, ({ payload }) => onStart(payload));
+        channel.on("broadcast", { event: "pipes" }, ({ payload }) => onPipes(payload));
         channel.on("presence", { event: "sync" }, onPresenceSync);
         channel.subscribe(async (status) => {
           if (status === "SUBSCRIBED") {
-            await channel.track({ id: myId, name: mp.name, playerName: mp.playerName });
+            await channel.track({ id: myId, name: mp.name, playerName: mp.playerName, host: mp.isHost, mode: mp.isHost ? mode : null });
             mp.inRoom = true;
             mpStatus.textContent = "";
+            updateDiffLock();
             showRoom();
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             mpStatus.textContent = "Connection problem — check your Supabase keys / network.";
@@ -1100,9 +1150,11 @@
     async function leaveRoom() {
       if (mp.channel) { try { await mp.channel.unsubscribe(); } catch (e) {} }
       if (supaClient && mp.channel) { try { supaClient.removeChannel(mp.channel); } catch (e) {} }
-      mp.channel = null; mp.inRoom = false; mp.online = false; mp.isHost = false;
+      mp.channel = null; mp.inRoom = false; mp.online = false;
+      mp.isHost = false; mp.pipeHost = false; mp.hostMode = null;
       mp.peers = {}; mp.results = null; mp.countdown = 0;
       reset();
+      updateDiffLock();
       showJoin();
       closeLobby();
     }
@@ -1153,7 +1205,11 @@
       if (mpRoom.hidden) return;
       const names = [mp.name + " (you)" + (mp.isHost ? " · host" : "")];
       for (const id in mp.peers) names.push(mp.peers[id].name || "player");
+      const dm = mp.isHost ? mode : mp.hostMode;
       mpPlayers.innerHTML = "";
+      const head = document.createElement("div");
+      head.innerHTML = "<b>Difficulty:</b> " + (dm ? dm[0].toUpperCase() + dm.slice(1) : "—") + " (host)";
+      mpPlayers.appendChild(head);
       for (const n of names) {
         const d = document.createElement("div");
         d.textContent = "🐦 " + n;
@@ -1184,9 +1240,9 @@
     });
     mpLeave.addEventListener("click", leaveRoom);
     mpStart.addEventListener("click", () => {
-      const seed = (Math.random() * 0xffffffff) >>> 0;
-      mp.channel && mp.channel.send({ type: "broadcast", event: "start", payload: { seed: seed, mode: mode } });
-      startRace(seed, mode); // host starts locally too (self:false)
+      const raceId = Date.now();
+      mp.channel && mp.channel.send({ type: "broadcast", event: "start", payload: { raceId: raceId, mode: mode } });
+      beginRace(raceId, mode, true); // host starts locally too (self:false)
     });
     // ==============================================================
 

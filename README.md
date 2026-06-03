@@ -21,9 +21,11 @@ drop an image in `players/` and add a line to the `PLAYERS` array in
 
 ## Online multiplayer (live "ghost race")
 
-Players on different devices fly the **same course** and see each other's birds
-live. One player creates a room and shares the **room code**; everyone who joins
-with that code races together. Last bird flying wins (ties broken by score).
+Players on different devices fly the **same course** (the host streams the pipes,
+so everyone sees an identical map) and see each other's birds live. One player
+creates a room and shares the **room code**; everyone who joins races together.
+Keep flying after others crash — the race runs until **everyone is out**, and the
+**highest score wins**.
 
 It uses **Supabase Realtime** (a server relay, so it works across networks
 without any peer-to-peer/firewall issues). Setup is one time and free:
