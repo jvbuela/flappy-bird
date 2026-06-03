@@ -640,6 +640,27 @@
       ctx.restore();
     }
 
+    // A bat wing for photo skins. side = -1 (left) / +1 (right); flaps with wing.
+    function drawBatWing(side, wing) {
+      ctx.save();
+      ctx.scale(side, 1);            // mirror for the left wing
+      ctx.translate(BIRD_R - 4, 0);  // shoulder at the body edge
+      ctx.rotate(-wing * 0.4);       // sweep up on a flap
+      ctx.fillStyle = "#2f2a3d";     // dark membrane
+      ctx.strokeStyle = "#1a1722";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -6);
+      ctx.lineTo(18, -12);                 // leading arm → wingtip
+      ctx.quadraticCurveTo(12, -2, 16, 2); // scallop → finger 1
+      ctx.quadraticCurveTo(9, 4, 11, 9);   // scallop → finger 2
+      ctx.quadraticCurveTo(5, 7, 0, 8);    // trailing edge back to shoulder
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw any bird (local or a remote "ghost") at a position, with a player
     // skin, opacity and optional name label.
     function drawCreature(x, y, rot, wing, plr, alpha, label) {
@@ -663,9 +684,10 @@
 
       const usePhoto = plr && plr.file && plr.ok && plr.img;
       if (usePhoto) {
-        // Photo skin: wing behind (peeks out past the edge so it never covers
-        // the face), then the circle-cropped face and outline on top.
-        drawWing(wing, -3, 8);
+        // Photo skin = a "bat": symmetric bat wings behind the face medallion,
+        // then the circle-cropped face and outline on top.
+        drawBatWing(-1, wing);
+        drawBatWing(1, wing);
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);

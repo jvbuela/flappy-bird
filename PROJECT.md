@@ -140,10 +140,11 @@ load.
 - The **Classic** bird is drawn to look like the original Flappy Bird: an oval
   yellow body with a white belly, a single feathered wing, a big eye, and a
   two-tone orange beak.
-- A **single animated wing** (`drawWing`, hinged at the shoulder) flaps up on
-  each tap and settles (`bird.wing` decays). On the Classic body it's drawn on
-  top; on photo skins it's drawn **behind** the face (offset to peek past the
-  circle edge) so personalized birds read as birds without covering the face.
+- **Classic** uses a single feathered wing (`drawWing`, hinged at the shoulder)
+  that flaps up on a tap and settles (`bird.wing` decays). **Photo skins render
+  as a "bat"**: the face medallion in the centre with **symmetric bat wings**
+  (`drawBatWing`, side = ∓1) drawn behind it, so the face is framed (never
+  covered) and the wings flap together with `bird.wing`.
 - Graceful fallback: a missing/broken image silently reverts to the Classic
   bird (`p.ok` tracks load success). Saved as `flappyPlayer`.
 - **To add a player:** drop an image in `players/` and add a line to `PLAYERS`
@@ -369,6 +370,7 @@ There's no automated test suite. Each change was checked by:
 | `8ef1782` | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
 | _next_ | Center the canvas with the controls (grid gutters); redesign the bird to a real Flappy look (single wing, belly, beak) incl. photo skins; add a 🌙 night/dark mode (starry scene + dark page theme) |
 | _next_ | Fix photo-bird wing covering the face: draw it behind the photo, offset to peek past the edge |
+| _next_ | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 
 ---
 
