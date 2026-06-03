@@ -128,8 +128,8 @@ in-canvas it overrides the background with a starry night scene (`bgNight` — d
 sky gradient, fixed star field `NIGHT_STARS`, glowing moon, mountain silhouette)
 and dims the ground; on the page it adds `body.dark`, darkening the chrome
 (background, buttons, modals, inputs) and updating the `theme-color` meta. The
-button label flips 🌙 Night ↔ ☀️ Day; `applyTheme()` applies the saved state on
-load.
+button label flips **🌙 NS Shift** (night) ↔ **☀️ SS Shift** (day);
+`applyTheme()` applies the saved state on load.
 
 ### 4.5 Players (photo birds + wings)
 - Driven by the `PLAYERS` array: `{ name, file }` entries. `"Classic"`

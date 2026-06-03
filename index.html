@@ -208,7 +208,7 @@
       <div id="actions" class="picker side side-right">
         <button id="mpOpen">🌐 Multiplayer</button>
         <button id="helpOpen">❓ How to play</button>
-        <button id="themeToggle">🌙 Night</button>
+        <button id="themeToggle">🌙 NS Shift</button>
         <button id="soundToggle">🔊 Sound</button>
       </div>
     </div>
@@ -1509,7 +1509,7 @@
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     function applyTheme() {
       document.body.classList.toggle("dark", night);
-      themeToggle.textContent = night ? "☀️ Day" : "🌙 Night";
+      themeToggle.textContent = night ? "☀️ SS Shift" : "🌙 NS Shift";
       if (themeColorMeta) themeColorMeta.content = night ? "#0b1026" : "#4ec0ca";
     }
     themeToggle.addEventListener("click", () => {
