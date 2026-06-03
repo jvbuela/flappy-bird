@@ -78,8 +78,13 @@ CodeTest2/
 
 ### 4.1 Core gameplay
 - **Flap:** click, tap, or `Space` / `↑`.
-- Bird physics: gravity (`GRAVITY`), upward impulse on flap (`FLAP`), rotation
-  follows velocity.
+- Bird physics: gravity (`GRAVITY`), upward impulse on flap (`FLAP`), a
+  terminal-velocity cap (`MAX_FALL`) so descents level off instead of
+  plummeting, and rotation that follows velocity. Tuned for a light,
+  controllable feel.
+- In multiplayer the bird **auto-flaps once at "GO"** (when the countdown hits
+  zero) so a slightly late first tap doesn't drop you instantly. Solo has no
+  countdown — it starts on your first flap from `READY`.
 - Pipes scroll right→left; pass through the gap to score. Hitting a pipe, the
   ground, or (clamped) the ceiling ends the run.
 - **Best score** saved in `localStorage` (`flappyBest`).
@@ -161,7 +166,10 @@ Sharing Debugger so cached previews refresh.
 - Everyone flies the **same pipes** and sees the others as semi-transparent
   **ghost birds** with name tags; a live **scoreboard** (top-right) shows scores.
 - **Win rule:** keep flying after others crash — the race runs until **everyone
-  is out**, and the **highest score wins**. A dead player keeps spectating live.
+  is out**, and the **highest score wins**. A dead player keeps spectating live;
+  their bird **drops to the ground and slides off-screen** (left behind by the
+  scrolling course, like the original Flappy Bird) rather than hovering in the
+  shared lane.
 - Host can **Rematch** (same room, fresh course) or anyone can **Leave**.
 
 ---
@@ -196,8 +204,10 @@ it / works offline).
 - `start { raceId, mode }` — host → all: begin a race with this id + difficulty.
 - `pipes { raceId, speed, course, list }` — host → all: authoritative pipe
   positions (~20 Hz).
-- `state { id, name, playerName, y, rot, wing, alive, score }` — each → all
-  (~12 Hz): a player's bird, for rendering ghosts + the scoreboard.
+- `state { id, name, playerName, x, y, rot, wing, alive, score }` — each → all
+  (~12 Hz): a player's bird, for rendering ghosts + the scoreboard. `x` is the
+  fixed lane while alive; once dead it carries the bird's off-screen slide
+  position so peers render the exit consistently.
 - **Presence** `track({ id, name, playerName, host, mode })` — lobby identity +
   the host's chosen difficulty.
 
@@ -227,8 +237,8 @@ it / works offline).
 
 Approximate function/area guide (single inline `<script>`):
 
-- **Tunables / constants:** `GRAVITY, FLAP, PIPE_W, PIPE_GAP, PIPE_SPACING,
-  PIPE_SPEED, GROUND_H, BIRD_R`, `STATE`.
+- **Tunables / constants:** `GRAVITY, FLAP, MAX_FALL, PIPE_W, PIPE_GAP,
+  PIPE_SPACING, PIPE_SPEED, GROUND_H, BIRD_R`, `STATE`.
 - **Config & state:** `MODES`, `PLAYERS`, `SUPABASE_URL`/`SUPABASE_ANON_KEY`,
   `mp` object, `pipeSeq`.
 - **Game logic:** `reset`, `progress`, `diffFor`/`difficulty`, `spawnPipe`,
@@ -310,6 +320,8 @@ There's no automated test suite. Each change was checked by:
 | `f33955d` | Add PROJECT.md (full project documentation) |
 | `e34b0ef` | Make layout responsive: scrollable page, fit-to-viewport canvas, stacked controls on small screens |
 | _next_ | Add social link preview (Open Graph/Twitter meta + generated `og-image.png` banner); document changes |
+| _next_ | Multiplayer: a dead bird drops and slides off-screen (broadcast `state.x`) instead of resting in the shared lane |
+| _next_ | Lighter bird feel: softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" so a late first tap doesn't drop you |
 
 ---
 

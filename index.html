@@ -295,14 +295,15 @@
     const H = canvas.height;
 
     // --- Tunables ---
-    const GRAVITY = 0.45;
-    const FLAP = -8;
+    const GRAVITY = 0.39;
+    const FLAP = -7.5;
     const PIPE_W = 60;
     const PIPE_GAP = 160;
     const PIPE_SPACING = 220;   // horizontal distance between pipe pairs
     const PIPE_SPEED = 2.2;
     const GROUND_H = 90;
     const BIRD_R = 14;
+    const MAX_FALL = 9;         // terminal velocity — caps the plummet for a predictable arc
 
     const STATE = { READY: 0, PLAYING: 1, OVER: 2 };
 
@@ -370,7 +371,7 @@
       alive: true,
       playerName: player.name,   // chosen bird (PLAYERS[].name)
       peers: {},            // id -> { name, playerName, y, rot, wing, alive, score, t, targetY }
-      countdown: 0,         // frames remaining before the race "go"
+      goAt: 0,              // wall-clock time (ms) when the race "go" happens
       results: null,        // array of standings when a race ends
     };
     let pipeSeq = 0;        // incrementing pipe id (host), reset each race
@@ -380,7 +381,7 @@
 
     function reset() {
       state = STATE.READY;
-      bird = { x: 90, y: H / 2, v: 0, rot: 0, wing: 0 };
+      bird = { x: 90, y: H / 2, v: 0, rot: 0, wing: 0, deadX: null };
       pipes = [];
       score = 0;
       frame = 0;
@@ -497,6 +498,7 @@
       if (mp.online && mp.countdown > 0) {
         mp.countdown--;
         bird.wing *= 0.85;
+        if (mp.countdown === 0) { bird.v = FLAP; bird.wing = 1; } // pop up at GO for reaction time
         sendStateThrottled();
         return;
       }
@@ -507,6 +509,7 @@
       const prog = progress();
 
       bird.v += GRAVITY;
+      if (bird.v > MAX_FALL) bird.v = MAX_FALL;
       bird.y += bird.v;
       bird.rot = Math.max(-0.5, Math.min(1.2, bird.v / 12));
       bird.wing *= 0.85; // wings settle back down after a flap
@@ -561,10 +564,11 @@
             if (mp.online) die(); else gameOver();
           }
         }
-      } else if (bird.y + BIRD_R > H - GROUND_H) {
-        // Dead in a race: rest on the ground while others finish.
-        bird.y = H - GROUND_H - BIRD_R;
-        bird.v = 0;
+      } else {
+        // Dead in a race: drop to the ground, then slide off-screen behind the pack.
+        if (bird.y + BIRD_R > H - GROUND_H) { bird.y = H - GROUND_H - BIRD_R; bird.v = 0; }
+        if (bird.deadX == null) bird.deadX = bird.x;
+        bird.deadX -= authority ? d.speed : mp.netSpeed;
       }
 
       // Online: smooth ghosts, broadcast my state/pipes, check for the race end.
@@ -671,14 +675,18 @@
     }
 
     function drawBird() {
-      drawCreature(bird.x, bird.y, bird.rot, bird.wing, player, 1, null);
+      const x = bird.deadX != null ? bird.deadX : bird.x;
+      if (x < -BIRD_R) return; // slid off-screen after dying
+      drawCreature(x, bird.y, bird.rot, bird.wing, player, 1, null);
     }
 
     function drawGhosts() {
       for (const id in mp.peers) {
         const pe = mp.peers[id];
         if (pe.y == null) continue;
-        drawCreature(bird.x, pe.y, pe.rot || 0, pe.wing || 0,
+        const gx = (pe.alive === false && pe.x != null) ? pe.x : bird.x;
+        if (gx < -BIRD_R) continue; // dead peer slid off-screen
+        drawCreature(gx, pe.y, pe.rot || 0, pe.wing || 0,
           findPlayer(pe.playerName), pe.alive === false ? 0.3 : 0.6, pe.name || "player");
       }
     }
@@ -1031,6 +1039,7 @@
       mp.channel.send({ type: "broadcast", event: "state", payload: {
         id: myId, name: mp.name, playerName: mp.playerName,
         y: bird.y, rot: bird.rot, wing: bird.wing, alive: mp.alive, score: score,
+        x: bird.deadX != null ? bird.deadX : bird.x,
       }});
     }
     function sendStateThrottled() { if (frame % 5 === 0) sendStateNow(); }
@@ -1099,7 +1108,7 @@
       // fresh per-race peer fields (identity kept)
       for (const id in mp.peers) {
         const pe = mp.peers[id];
-        pe.alive = undefined; pe.score = 0; pe.y = null; pe.targetY = null;
+        pe.alive = undefined; pe.score = 0; pe.y = null; pe.targetY = null; pe.x = null;
       }
       mp.online = true;
       mp.alive = true;
@@ -1116,7 +1125,7 @@
       if (!p || p.id === myId) return;
       const pe = mp.peers[p.id] || (mp.peers[p.id] = {});
       pe.name = p.name; pe.playerName = p.playerName;
-      pe.rot = p.rot; pe.wing = p.wing; pe.alive = p.alive; pe.score = p.score;
+      pe.rot = p.rot; pe.wing = p.wing; pe.alive = p.alive; pe.score = p.score; pe.x = p.x;
       pe.targetY = p.y; if (pe.y == null) pe.y = p.y;
       pe.t = performance.now();
     }
