@@ -343,12 +343,13 @@ There's no automated test suite. Each change was checked by:
 | `82afa15` | Fix multiplayer: host-authoritative pipes, inherit host difficulty, end race only when all are out |
 | `f33955d` | Add PROJECT.md (full project documentation) |
 | `e34b0ef` | Make layout responsive: scrollable page, fit-to-viewport canvas, stacked controls on small screens |
-| _next_ | Add social link preview (Open Graph/Twitter meta + generated `og-image.png` banner); document changes |
-| _next_ | Multiplayer: a dead bird drops and slides off-screen (broadcast `state.x`) instead of resting in the shared lane |
-| _next_ | Lighter bird feel: softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" so a late first tap doesn't drop you |
-| _next_ | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
-| _next_ | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
-| _next_ | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
+| `957ec09` | Add social link preview: Open Graph/Twitter meta + generated `og-image.png` banner; update docs |
+| `dfbb8fa` | Personalize banner: `mlacu` + `jkdgu` photos and "ROC Network & friends" text |
+| `6ae9b14` | Set absolute social-preview URLs to the live Vercel domain; add live-demo link |
+| `000b989` | Multiplayer: a dead bird drops and slides off-screen (broadcast `state.x`); lighter bird feel — softer gravity/flap, terminal-velocity cap (`MAX_FALL`), and an auto-flap at race "GO" |
+| `2ba14bc` | Retune physics to mirror the original Flappy Bird (gravity 0.29, flap -5.25, terminal 6, tighter nose-dive), scaled from the 30 fps / 288×512 reference to 60 fps / 600px |
+| `9b3d3ca` | Per-mode global all-time best scores via Supabase (`best_scores` table + `submit_best` RPC), with a local `flappyBest:<mode>` cache fallback; shows the record holder's name |
+| `8ef1782` | In-canvas "🏆 Flappy Best! — ROC Spotlight Award" top-3 podium (per-player rows, per mode); add a main-page "Your name" field so solo scores carry a name |
 
 ---
 
