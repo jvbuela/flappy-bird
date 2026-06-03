@@ -114,10 +114,10 @@
     // "Classic" (file: null) is the drawn bird and always works.
     const PLAYERS = [
       { name: "Classic", file: null },
-      { name: "Player 1", file: "players/cliar.png" },
-      { name: "Player 2", file: "players/jkdgu.png" },
-      { name: "Player 3", file: "players/kicmo.png" },
-      { name: "Player 4", file: "players/mlacu.png" },
+      { name: "cliar", file: "players/cliar.png" },
+      { name: "jkdgu", file: "players/jkdgu.png" },
+      { name: "kicmo", file: "players/kicmo.png" },
+      { name: "mlacu", file: "players/mlacu.png" },
     ];
 
     // Preload photos; track load success so we can fall back gracefully.
@@ -306,17 +306,19 @@
       drawWing(1);
 
       if (usePhoto) {
-        // Circular photo body (cover-fit a square into the bird circle).
+        // Circular photo body: focal crop that zooms toward the face and
+        // centers it (photos are landscape with the face in the upper-middle).
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.clip();
         const img = player.img;
-        const s = BIRD_R * 2;
-        const ar = img.width / img.height || 1;
-        let dw = s, dh = s;
-        if (ar > 1) dw = s * ar; else dh = s / ar; // cover
-        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        const cover = Math.max((BIRD_R * 2) / img.width, (BIRD_R * 2) / img.height);
+        const scale = cover * (player.zoom || 1.4);
+        const dw = img.width * scale, dh = img.height * scale;
+        const fx = player.focusX != null ? player.focusX : 0.5;
+        const fy = player.focusY != null ? player.focusY : 0.40;
+        ctx.drawImage(img, -fx * dw, -fy * dh, dw, dh);
         ctx.restore();
         // outline
         ctx.strokeStyle = "#553847";
