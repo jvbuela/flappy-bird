@@ -80,6 +80,62 @@
       background: #f2d22e;
       box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
     }
+    /* Multiplayer lobby modal */
+    #lobby {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #lobby[hidden] { display: none; }
+    #lobbyCard {
+      position: relative;
+      width: min(92vw, 360px);
+      background: #fff8e6;
+      border: 3px solid #553847;
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      color: #553847;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    }
+    #lobbyCard h2 { margin: 0 0 8px; font-size: 20px; }
+    #lobbyCard label { display: block; font-size: 13px; margin: 8px 0; }
+    #lobbyCard input {
+      font: inherit;
+      padding: 7px 10px;
+      border: 2px solid #553847;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+    #mpCode { text-transform: uppercase; width: 90px; }
+    #lobbyCard button {
+      font: inherit;
+      font-weight: 600;
+      padding: 8px 14px;
+      border: 2px solid #553847;
+      border-radius: 999px;
+      background: #f2d22e;
+      color: #553847;
+      cursor: pointer;
+    }
+    #lobbyCard button:hover { filter: brightness(1.05); }
+    #lobbyCard button:disabled { opacity: 0.5; cursor: default; }
+    #mpClose {
+      position: absolute; top: 8px; right: 8px;
+      background: #fff !important; padding: 2px 9px !important; font-size: 14px;
+    }
+    .mp-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .mp-or { font-size: 12px; opacity: 0.7; }
+    .mp-hint { font-size: 12px; opacity: 0.8; margin: 6px 0 0; }
+    .mp-status { font-size: 12px; min-height: 16px; margin: 0 0 6px; color: #b5453b; font-weight: 600; }
+    .mp-players { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; min-height: 24px; }
+    .mp-players div { font-size: 14px; }
+    .mp-mini, .mp-ghostbtn { background: #fff !important; font-size: 12px !important; padding: 4px 10px !important; }
   </style>
 </head>
 <body>
@@ -102,6 +158,41 @@
     </div>
     <div class="picker-label">Player</div>
     <div id="playerPicker" class="picker"></div>
+    <div class="picker" style="margin-top:6px">
+      <button id="mpOpen">🌐 Multiplayer</button>
+    </div>
+  </div>
+
+  <!-- Multiplayer lobby modal -->
+  <div id="lobby" hidden>
+    <div id="lobbyCard">
+      <button id="mpClose" title="Close">✕</button>
+      <h2>🌐 Online Multiplayer</h2>
+      <p id="mpStatus" class="mp-status"></p>
+
+      <div id="mpJoin">
+        <label>Your name
+          <input id="mpName" maxlength="14" placeholder="name" />
+        </label>
+        <p class="mp-hint">Your selected <b>Player</b> bird and (host's) <b>Difficulty</b> are used.</p>
+        <div class="mp-row">
+          <button id="mpCreate">Create room</button>
+          <span class="mp-or">or</span>
+          <input id="mpCode" maxlength="6" placeholder="CODE" />
+          <button id="mpJoinBtn">Join</button>
+        </div>
+      </div>
+
+      <div id="mpRoom" hidden>
+        <p>Room code: <b id="mpRoomCode"></b> <button id="mpCopy" class="mp-mini">copy</button></p>
+        <div id="mpPlayers" class="mp-players"></div>
+        <div class="mp-row">
+          <button id="mpStart" hidden>Start race</button>
+          <span id="mpWait" class="mp-hint" hidden>Waiting for the host to start…</span>
+          <button id="mpLeave" class="mp-ghostbtn">Leave</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -122,7 +213,7 @@
 
     const STATE = { READY: 0, PLAYING: 1, OVER: 2 };
 
-    let state, bird, pipes, score, best, frame, unlocked, banner;
+    let state, bird, pipes, score, best, frame, unlocked, banner, course;
     best = Number(localStorage.getItem("flappyBest") || 0);
 
     const BACKGROUNDS = ["mountains", "clouds", "ocean"];
@@ -163,49 +254,97 @@
 
     let player = PLAYERS.find((p) => p.name === localStorage.getItem("flappyPlayer")) || PLAYERS[0];
 
+    // ================= ONLINE MULTIPLAYER (Supabase Realtime) =================
+    // 1) Create a free project at https://supabase.com
+    // 2) Project Settings -> API: copy the Project URL and the "anon public" key
+    // 3) Paste them below. (The anon key is safe to expose in client code.)
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+    const SUPA_READY = !/^YOUR_/.test(SUPABASE_URL) && !/^YOUR_/.test(SUPABASE_ANON_KEY);
+
+    const myId = Math.random().toString(36).slice(2, 9);
+    const mp = {
+      online: false,        // in a race right now
+      inRoom: false,        // joined a lobby
+      channel: null,
+      isHost: false,
+      hostId: null,
+      code: null,
+      name: "",
+      playerName: player.name,   // chosen bird (PLAYERS[].name)
+      peers: {},            // id -> { name, playerName, y, rot, wing, alive, score, t, targetY }
+      seed: 0,
+      countdown: 0,         // frames remaining before the race "go"
+      results: null,        // array of standings when a race ends
+    };
+
+    // Deterministic PRNG so every client builds the identical pipe course.
+    function mulberry32(a) {
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    let rngFn = Math.random;        // solo uses Math.random; a race swaps in a seeded rng
+    function R() { return rngFn(); }
+
+    function findPlayer(name) { return PLAYERS.find((p) => p.name === name) || PLAYERS[0]; }
+    // =========================================================================
+
     function reset() {
       state = STATE.READY;
       bird = { x: 90, y: H / 2, v: 0, rot: 0, wing: 0 };
       pipes = [];
       score = 0;
       frame = 0;
+      course = 0;
       unlocked = {};
       banner = null;
     }
 
     function rand(a, b) {
-      return a + Math.random() * (b - a);
+      return a + R() * (b - a);
     }
 
-    // Difficulty values derived from the current score and selected mode (capped).
-    function difficulty() {
+    // How far into the difficulty ramp we are. Online uses a shared course index
+    // (so the curve matches for everyone); solo uses the personal score.
+    function progress() { return mp.online ? course : score; }
+
+    // Difficulty values derived from progress() and the selected mode (capped).
+    function diffFor(prog) {
       const m = M();
       return {
-        speed: Math.min(m.maxSpeed, m.speed + score * m.speedRamp),
-        gap: Math.max(m.minGap, m.gap - score * m.gapDrop),
-        spacing: Math.max(m.minSpacing, m.spacing - score * m.spacingDrop),
-        level: 1 + Math.floor(score / 5),
+        speed: Math.min(m.maxSpeed, m.speed + prog * m.speedRamp),
+        gap: Math.max(m.minGap, m.gap - prog * m.gapDrop),
+        spacing: Math.max(m.minSpacing, m.spacing - prog * m.spacingDrop),
+        level: 1 + Math.floor(prog / 5),
       };
     }
+    function difficulty() { return diffFor(progress()); }
 
     function showBanner(text) {
       banner = { text: text, until: frame + 110 };
     }
 
     function spawnPipe() {
-      const d = difficulty();
+      // The pipe's shape depends only on the course index (and the seeded RNG in
+      // online mode), so every client builds an identical sequence of pipes.
+      const prog = progress();
+      const d = diffFor(prog);
+      const m = M();
       const margin = 55;
 
       // Wide pipes unlock at the mode's threshold, with a rising chance.
-      const m = M();
       let w = PIPE_W;
-      if (score >= m.wideAt && Math.random() < Math.min(0.5, (score - m.wideAt) * 0.04)) {
+      if (prog >= m.wideAt && R() < Math.min(0.5, (prog - m.wideAt) * 0.04)) {
         w = 90;
       }
 
       // Moving pipes unlock at the mode's threshold, with a rising chance.
       let amp = 0, mspeed = 0;
-      if (score >= m.moveAt && Math.random() < Math.min(0.6, (score - m.moveAt) * 0.04)) {
+      if (prog >= m.moveAt && R() < Math.min(0.6, (prog - m.moveAt) * 0.04)) {
         amp = rand(28, 64);
         mspeed = rand(0.02, 0.04);
       }
@@ -213,7 +352,7 @@
       // Pick a base top that keeps the gap (plus mover travel) on the field.
       const lo = margin + amp;
       const hi = H - GROUND_H - d.gap - margin - amp;
-      const baseTop = lo + Math.random() * Math.max(0, hi - lo);
+      const baseTop = lo + R() * Math.max(0, hi - lo);
 
       pipes.push({
         x: W,
@@ -223,12 +362,21 @@
         top: baseTop,
         amp: amp,
         mspeed: mspeed,
-        phase: Math.random() * Math.PI * 2,
+        phase: R() * Math.PI * 2,
         passed: false,
       });
+      course++;   // advance the shared difficulty/course index
     }
 
     function flap() {
+      if (mp.online) {
+        // In a race you only ever flap your own bird (no start/restart here).
+        if (state === STATE.PLAYING && mp.countdown === 0 && mp.alive) {
+          bird.v = FLAP;
+          bird.wing = 1;
+        }
+        return;
+      }
       if (state === STATE.READY) {
         state = STATE.PLAYING;
         bird.v = FLAP;
@@ -249,9 +397,28 @@
       }
     }
 
+    // Online: my bird crashed — become a spectator but keep the race running.
+    function die() {
+      if (!mp.alive) return;
+      mp.alive = false;
+      sendStateNow();
+    }
+
     function update() {
       frame++;
+
+      // Online pre-race countdown: hover in place until "go".
+      if (mp.online && mp.countdown > 0) {
+        mp.countdown--;
+        bird.wing *= 0.85;
+        sendStateThrottled();
+        return;
+      }
+
       if (state !== STATE.PLAYING) return;
+
+      const meAlive = !mp.online || mp.alive;
+      const prog = progress();
 
       bird.v += GRAVITY;
       bird.y += bird.v;
@@ -271,7 +438,7 @@
         if (p.amp > 0) {
           p.top = p.baseTop + Math.sin(frame * p.mspeed + p.phase) * p.amp;
         }
-        if (!p.passed && p.x + p.w < bird.x) {
+        if (meAlive && !p.passed && p.x + p.w < bird.x) {
           p.passed = true;
           score++;
         }
@@ -279,41 +446,51 @@
       pipes = pipes.filter((p) => p.x + p.w > 0);
 
       // Announce newly unlocked challenges / level-ups via a brief banner.
-      if (!unlocked.moving && score >= M().moveAt) { unlocked.moving = true; showBanner("↕ Moving pipes!"); }
-      else if (!unlocked.wide && score >= M().wideAt) { unlocked.wide = true; showBanner("▭ Wide pipes!"); }
-      else if (unlocked.lastLevel !== d.level && score > 0) {
+      if (!unlocked.moving && prog >= M().moveAt) { unlocked.moving = true; showBanner("↕ Moving pipes!"); }
+      else if (!unlocked.wide && prog >= M().wideAt) { unlocked.wide = true; showBanner("▭ Wide pipes!"); }
+      else if (unlocked.lastLevel !== d.level && prog > 0) {
         if (unlocked.lastLevel !== undefined) showBanner("⚡ Level " + d.level + " — faster & tighter!");
         unlocked.lastLevel = d.level;
       }
 
-      // Collisions: ground / ceiling.
-      if (bird.y + BIRD_R > H - GROUND_H) {
+      // Collisions for my own bird.
+      if (meAlive) {
+        if (bird.y + BIRD_R > H - GROUND_H) {
+          bird.y = H - GROUND_H - BIRD_R;
+          if (mp.online) die(); else gameOver();
+        }
+        if (bird.y - BIRD_R < 0) {
+          bird.y = BIRD_R;
+          bird.v = 0;
+        }
+        for (const p of pipes) {
+          const inX = bird.x + BIRD_R > p.x && bird.x - BIRD_R < p.x + p.w;
+          if (inX && (bird.y - BIRD_R < p.top || bird.y + BIRD_R > p.top + p.gap)) {
+            if (mp.online) die(); else gameOver();
+          }
+        }
+      } else if (bird.y + BIRD_R > H - GROUND_H) {
+        // Dead in a race: rest on the ground while others finish.
         bird.y = H - GROUND_H - BIRD_R;
-        gameOver();
-      }
-      if (bird.y - BIRD_R < 0) {
-        bird.y = BIRD_R;
         bird.v = 0;
       }
 
-      // Collisions: pipes (circle vs rect, approximated by bird bounding box).
-      for (const p of pipes) {
-        const inX = bird.x + BIRD_R > p.x && bird.x - BIRD_R < p.x + p.w;
-        if (inX) {
-          const gapTop = p.top;
-          const gapBottom = p.top + p.gap;
-          if (bird.y - BIRD_R < gapTop || bird.y + BIRD_R > gapBottom) {
-            gameOver();
+      // Online: smooth ghosts, broadcast my state, check for the race end.
+      if (mp.online) {
+        for (const id in mp.peers) {
+          const pe = mp.peers[id];
+          if (pe.targetY != null) {
+            pe.y = pe.y == null ? pe.targetY : pe.y + (pe.targetY - pe.y) * 0.3;
           }
         }
+        sendStateThrottled();
+        checkRaceEnd();
       }
     }
 
     // One feathered wing, hinged at the shoulder. side = -1 (left) or +1 (right).
-    function drawWing(side) {
-      // wing=1 -> raised up; wing=0 -> resting down.
-      const up = bird.wing;
-      const angle = side * (0.35 - up * 1.0); // sweeps upward on a flap
+    function drawWing(side, wing) {
+      const angle = side * (0.35 - wing * 1.0); // sweeps upward on a flap
       ctx.save();
       ctx.translate(side * (BIRD_R - 3), -2);
       ctx.rotate(angle);
@@ -327,33 +504,44 @@
       ctx.restore();
     }
 
-    function drawBird() {
+    // Draw any bird (local or a remote "ghost") at a position, with a player
+    // skin, opacity and optional name label.
+    function drawCreature(x, y, rot, wing, plr, alpha, label) {
       ctx.save();
-      ctx.translate(bird.x, bird.y);
-      ctx.rotate(bird.rot);
+      ctx.globalAlpha = alpha;
 
-      const usePhoto = player.file && player.ok && player.img;
+      if (label) {
+        ctx.globalAlpha = Math.min(1, alpha + 0.3);
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 3;
+        ctx.font = "bold 11px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.strokeText(label, x, y - BIRD_R - 8);
+        ctx.fillText(label, x, y - BIRD_R - 8);
+        ctx.globalAlpha = alpha;
+      }
 
-      // Wings behind the body.
-      drawWing(-1);
-      drawWing(1);
+      ctx.translate(x, y);
+      ctx.rotate(rot);
 
+      drawWing(-1, wing);
+      drawWing(1, wing);
+
+      const usePhoto = plr && plr.file && plr.ok && plr.img;
       if (usePhoto) {
-        // Circular photo body: focal crop that zooms toward the face and
-        // centers it (photos are landscape with the face in the upper-middle).
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.clip();
-        const img = player.img;
+        const img = plr.img;
         const cover = Math.max((BIRD_R * 2) / img.width, (BIRD_R * 2) / img.height);
-        const scale = cover * (player.zoom || 1.4);
+        const scale = cover * (plr.zoom || 1.4);
         const dw = img.width * scale, dh = img.height * scale;
-        const fx = player.focusX != null ? player.focusX : 0.5;
-        const fy = player.focusY != null ? player.focusY : 0.40;
+        const fx = plr.focusX != null ? plr.focusX : 0.5;
+        const fy = plr.focusY != null ? plr.focusY : 0.40;
         ctx.drawImage(img, -fx * dw, -fy * dh, dw, dh);
         ctx.restore();
-        // outline
         ctx.strokeStyle = "#553847";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -368,7 +556,6 @@
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        // eye
         ctx.fillStyle = "#fff";
         ctx.beginPath();
         ctx.arc(6, -5, 5, 0, Math.PI * 2);
@@ -378,7 +565,6 @@
         ctx.beginPath();
         ctx.arc(8, -5, 2, 0, Math.PI * 2);
         ctx.fill();
-        // beak
         ctx.fillStyle = "#e8702a";
         ctx.beginPath();
         ctx.moveTo(BIRD_R - 2, -2);
@@ -389,6 +575,19 @@
         ctx.stroke();
       }
       ctx.restore();
+    }
+
+    function drawBird() {
+      drawCreature(bird.x, bird.y, bird.rot, bird.wing, player, 1, null);
+    }
+
+    function drawGhosts() {
+      for (const id in mp.peers) {
+        const pe = mp.peers[id];
+        if (pe.y == null) continue;
+        drawCreature(bird.x, pe.y, pe.rot || 0, pe.wing || 0,
+          findPlayer(pe.playerName), pe.alive === false ? 0.3 : 0.6, pe.name || "player");
+      }
     }
 
     function drawPipe(p) {
@@ -532,6 +731,7 @@
 
       for (const p of pipes) drawPipe(p);
       drawGround();
+      if (mp.online) drawGhosts();
       drawBird();
 
       // Score (during play / over)
@@ -558,6 +758,11 @@
         ctx.restore();
       }
 
+      if (mp.online) {
+        drawOnlineHud();
+        return;
+      }
+
       if (state === STATE.READY) {
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,0.15)";
@@ -574,6 +779,64 @@
         centerText("Score: " + score, H / 2, 24, "#fff");
         centerText("Best: " + best, H / 2 + 32, 20, "#fff");
         centerText("Click / Tap / Space to restart", H / 2 + 70, 16, "#fff");
+        ctx.restore();
+      }
+    }
+
+    // Online HUD: live scoreboard, pre-race countdown, and results.
+    function drawOnlineHud() {
+      // Scoreboard (top-right): everyone's score, dimmed when out.
+      const rows = [{ name: mp.name + " (you)", score: score, alive: mp.alive }];
+      for (const id in mp.peers) {
+        const pe = mp.peers[id];
+        if (pe.alive !== undefined || pe.score != null) {
+          rows.push({ name: pe.name || "player", score: pe.score || 0, alive: pe.alive !== false });
+        }
+      }
+      rows.sort((a, b) => b.score - a.score);
+      ctx.save();
+      ctx.font = "bold 13px 'Segoe UI', sans-serif";
+      ctx.textAlign = "right";
+      let y = 24;
+      for (const r of rows) {
+        ctx.globalAlpha = r.alive ? 1 : 0.45;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 3;
+        const t = (r.alive ? "" : "💀 ") + r.name + "  " + r.score;
+        ctx.strokeText(t, W - 12, y);
+        ctx.fillText(t, W - 12, y);
+        y += 18;
+      }
+      ctx.restore();
+
+      // Countdown before the race begins.
+      if (mp.countdown > 0) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(0, 0, W, H);
+        const n = Math.ceil(mp.countdown / 40);
+        centerText(n > 0 ? String(n) : "GO!", H / 2, 80, "#fff");
+        centerText("Get ready…", H / 2 - 70, 20, "#fff");
+        ctx.restore();
+      }
+
+      // Results overlay.
+      if (state === STATE.OVER && mp.results) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(0, 0, W, H);
+        const winner = mp.results[0];
+        centerText("🏆 " + (winner.me ? "You win!" : winner.name + " wins!"), H / 2 - 130, 28, "#ffe14d");
+        ctx.font = "bold 16px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        let ry = H / 2 - 80;
+        mp.results.forEach((r, i) => {
+          ctx.fillStyle = r.me ? "#ffe14d" : "#fff";
+          ctx.fillText((i + 1) + ". " + r.name + (r.alive ? " 🐦" : " 💀") + "  —  " + r.score, W / 2, ry);
+          ry += 26;
+        });
+        centerText("Use the Multiplayer panel to rematch or leave", H / 2 + 130, 13, "#ddd");
         ctx.restore();
       }
     }
@@ -644,6 +907,222 @@
       });
     });
     updateDiffButtons();
+
+    // ===================== MULTIPLAYER WIRING =====================
+    const COUNTDOWN = 120; // frames (~2s) before "go"
+    let supaClient = null;
+
+    async function getSupa() {
+      if (supaClient) return supaClient;
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      supaClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        realtime: { params: { eventsPerSecond: 20 } },
+      });
+      return supaClient;
+    }
+
+    // ----- network senders (referenced by the game loop) -----
+    function sendStateNow() {
+      if (!mp.channel) return;
+      mp.channel.send({ type: "broadcast", event: "state", payload: {
+        id: myId, name: mp.name, playerName: mp.playerName,
+        y: bird.y, rot: bird.rot, wing: bird.wing, alive: mp.alive, score: score,
+      }});
+    }
+    function sendStateThrottled() { if (frame % 5 === 0) sendStateNow(); }
+
+    function checkRaceEnd() {
+      if (state !== STATE.PLAYING) return;
+      let parts = 1, aliveCount = mp.alive ? 1 : 0;
+      for (const id in mp.peers) {
+        const pe = mp.peers[id];
+        if (pe.alive !== undefined) { parts++; if (pe.alive) aliveCount++; }
+      }
+      const ended = parts >= 2 ? aliveCount <= 1 : !mp.alive;
+      if (ended) endRace();
+    }
+
+    function endRace() {
+      const board = [{ name: mp.name, score: score, alive: mp.alive, me: true }];
+      for (const id in mp.peers) {
+        const pe = mp.peers[id];
+        if (pe.alive !== undefined) board.push({ name: pe.name || "player", score: pe.score || 0, alive: pe.alive });
+      }
+      board.sort((a, b) => (b.score - a.score) || ((b.alive ? 1 : 0) - (a.alive ? 1 : 0)));
+      mp.results = board;
+      state = STATE.OVER;
+      if (score > best) { best = score; localStorage.setItem("flappyBest", String(best)); }
+      lobby.hidden = false; // reopen the panel for rematch / leave
+      showRoom();
+    }
+
+    // ----- start / rematch -----
+    function startRace(seed, m) {
+      mode = m; updateDiffButtons();
+      rngFn = mulberry32(seed >>> 0);
+      reset();                 // clears pipes, course=0, state=READY
+      // fresh per-race peer fields (identity kept)
+      for (const id in mp.peers) {
+        const pe = mp.peers[id];
+        pe.alive = undefined; pe.score = 0; pe.y = null; pe.targetY = null;
+      }
+      mp.online = true;
+      mp.alive = true;
+      mp.results = null;
+      mp.countdown = COUNTDOWN;
+      state = STATE.PLAYING;   // countdown gate inside update() holds the start
+      closeLobby();
+    }
+
+    // ----- channel message handlers -----
+    function onState(p) {
+      if (!p || p.id === myId) return;
+      const pe = mp.peers[p.id] || (mp.peers[p.id] = {});
+      pe.name = p.name; pe.playerName = p.playerName;
+      pe.rot = p.rot; pe.wing = p.wing; pe.alive = p.alive; pe.score = p.score;
+      pe.targetY = p.y; if (pe.y == null) pe.y = p.y;
+      pe.t = performance.now();
+    }
+    function onStart(p) {
+      if (!p) return;
+      startRace(p.seed, p.mode);
+    }
+    function onPresenceSync() {
+      if (!mp.channel) return;
+      const st = mp.channel.presenceState();
+      const present = new Set();
+      for (const key in st) {
+        const meta = st[key][0] || {};
+        if (meta.id && meta.id !== myId) {
+          present.add(meta.id);
+          const pe = mp.peers[meta.id] || (mp.peers[meta.id] = {});
+          pe.name = meta.name; pe.playerName = meta.playerName;
+        }
+      }
+      // drop peers that left
+      for (const id in mp.peers) if (!present.has(id)) delete mp.peers[id];
+      renderPlayers();
+    }
+
+    // ----- room lifecycle -----
+    async function enterRoom(code, asHost) {
+      if (!SUPA_READY) {
+        mpStatus.textContent = "Add your Supabase URL + anon key in index.html to enable online play.";
+        return;
+      }
+      mp.name = (mpName.value.trim() || player.name).slice(0, 14);
+      mp.playerName = player.name;
+      mp.code = code; mp.isHost = asHost;
+      mpStatus.textContent = "Connecting…";
+      try {
+        const supa = await getSupa();
+        const channel = supa.channel("flappy:" + code, {
+          config: { broadcast: { self: false }, presence: { key: myId } },
+        });
+        channel.on("broadcast", { event: "state" }, ({ payload }) => onState(payload));
+        channel.on("broadcast", { event: "start" }, ({ payload }) => onStart(payload));
+        channel.on("presence", { event: "sync" }, onPresenceSync);
+        channel.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel.track({ id: myId, name: mp.name, playerName: mp.playerName });
+            mp.inRoom = true;
+            mpStatus.textContent = "";
+            showRoom();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            mpStatus.textContent = "Connection problem — check your Supabase keys / network.";
+          }
+        });
+        mp.channel = channel;
+      } catch (e) {
+        mpStatus.textContent = "Could not load the realtime library (offline?).";
+      }
+    }
+
+    async function leaveRoom() {
+      if (mp.channel) { try { await mp.channel.unsubscribe(); } catch (e) {} }
+      if (supaClient && mp.channel) { try { supaClient.removeChannel(mp.channel); } catch (e) {} }
+      mp.channel = null; mp.inRoom = false; mp.online = false; mp.isHost = false;
+      mp.peers = {}; mp.results = null; mp.countdown = 0;
+      reset();
+      showJoin();
+      closeLobby();
+    }
+
+    function randomCode() {
+      const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let s = ""; for (let i = 0; i < 4; i++) s += a[Math.floor(Math.random() * a.length)];
+      return s;
+    }
+
+    // ----- lobby DOM -----
+    const lobby = document.getElementById("lobby");
+    const mpOpen = document.getElementById("mpOpen");
+    const mpClose = document.getElementById("mpClose");
+    const mpName = document.getElementById("mpName");
+    const mpCreate = document.getElementById("mpCreate");
+    const mpCode = document.getElementById("mpCode");
+    const mpJoinBtn = document.getElementById("mpJoinBtn");
+    const mpJoinBox = document.getElementById("mpJoin");
+    const mpRoom = document.getElementById("mpRoom");
+    const mpRoomCode = document.getElementById("mpRoomCode");
+    const mpCopy = document.getElementById("mpCopy");
+    const mpPlayers = document.getElementById("mpPlayers");
+    const mpStart = document.getElementById("mpStart");
+    const mpWait = document.getElementById("mpWait");
+    const mpLeave = document.getElementById("mpLeave");
+    const mpStatus = document.getElementById("mpStatus");
+
+    mpName.value = localStorage.getItem("flappyName") || player.name;
+
+    function openLobby() {
+      if (!SUPA_READY) mpStatus.textContent = "Add your Supabase URL + anon key in index.html to enable online play.";
+      lobby.hidden = false;
+      if (mp.inRoom) showRoom(); else showJoin();
+    }
+    function closeLobby() { lobby.hidden = true; }
+    function showJoin() { mpJoinBox.hidden = false; mpRoom.hidden = true; }
+    function showRoom() {
+      mpJoinBox.hidden = true; mpRoom.hidden = false;
+      mpRoomCode.textContent = mp.code || "";
+      mpStart.hidden = !mp.isHost;
+      mpWait.hidden = mp.isHost;
+      if (mp.results) { mpStart.textContent = "Rematch"; }
+      else { mpStart.textContent = "Start race"; }
+      renderPlayers();
+    }
+    function renderPlayers() {
+      if (mpRoom.hidden) return;
+      const names = [mp.name + " (you)" + (mp.isHost ? " · host" : "")];
+      for (const id in mp.peers) names.push(mp.peers[id].name || "player");
+      mpPlayers.innerHTML = "";
+      for (const n of names) {
+        const d = document.createElement("div");
+        d.textContent = "🐦 " + n;
+        mpPlayers.appendChild(d);
+      }
+    }
+
+    mpOpen.addEventListener("click", openLobby);
+    mpClose.addEventListener("click", closeLobby);
+    mpName.addEventListener("input", () => localStorage.setItem("flappyName", mpName.value.trim()));
+    mpCreate.addEventListener("click", () => enterRoom(randomCode(), true));
+    mpJoinBtn.addEventListener("click", () => {
+      const c = (mpCode.value || "").trim().toUpperCase();
+      if (c.length >= 3) enterRoom(c, false);
+      else mpStatus.textContent = "Enter a room code to join.";
+    });
+    mpCopy.addEventListener("click", () => {
+      navigator.clipboard && navigator.clipboard.writeText(mp.code || "");
+      mpCopy.textContent = "copied!";
+      setTimeout(() => (mpCopy.textContent = "copy"), 1200);
+    });
+    mpLeave.addEventListener("click", leaveRoom);
+    mpStart.addEventListener("click", () => {
+      const seed = (Math.random() * 0xffffffff) >>> 0;
+      mp.channel && mp.channel.send({ type: "broadcast", event: "start", payload: { seed: seed, mode: mode } });
+      startRace(seed, mode); // host starts locally too (self:false)
+    });
+    // ==============================================================
 
     reset();
     loop();
