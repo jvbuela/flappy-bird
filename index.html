@@ -4,21 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flappy Bird — play & race friends online</title>
-  <meta name="description" content="A web Flappy Bird with photo players, difficulty modes, and live online multiplayer. Tap to flap and race your friends!" />
+  <meta name="description" content="A web Flappy Bird with photo players, collectible power-ups, an NS/SS day-night shift, difficulty modes, and live online multiplayer. Tap to flap and race your friends!" />
 
   <!-- Social link preview (Messenger / Facebook / Twitter / Discord). -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://flappy-bird-ni-mark.vercel.app/" />
   <meta property="og:title" content="Play Flappy Bird with ROC Network & friends" />
-  <meta property="og:description" content="A web Flappy Bird with photo players, difficulty modes, and live online multiplayer. Tap to flap and race your friends!" />
-  <meta property="og:image" content="https://flappy-bird-ni-mark.vercel.app/og-image.png" />
+  <meta property="og:description" content="A web Flappy Bird with photo players, collectible power-ups, an NS/SS day-night shift, difficulty modes, and live online multiplayer. Tap to flap and race your friends!" />
+  <meta property="og:image" content="https://flappy-bird-ni-mark.vercel.app/og-image.png?v=2" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Flappy Bird — play with ROC Network & friends" />
+  <meta property="og:image:alt" content="Flappy Bird — power-ups, NS/SS day-night shift, play with ROC Network & friends" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Play Flappy Bird with ROC Network & friends" />
-  <meta name="twitter:description" content="A web Flappy Bird with photo players, difficulty modes, and live online multiplayer." />
-  <meta name="twitter:image" content="https://flappy-bird-ni-mark.vercel.app/og-image.png" />
+  <meta name="twitter:description" content="A web Flappy Bird with photo players, collectible power-ups, an NS/SS day-night shift, difficulty modes, and live online multiplayer." />
+  <meta name="twitter:image" content="https://flappy-bird-ni-mark.vercel.app/og-image.png?v=2" />
   <meta name="theme-color" content="#4ec0ca" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -239,7 +239,7 @@
           <b>moving</b> and <b>wide</b> pipes.</li>
         <li><b>Power-ups</b> (solo) float in from <b>level 5</b> — they look like
           your friends! Fly into one: <span class="tag">❤️</span> extra life,
-          <span class="tag">👻</span> 30s pass-through, and from <b>level 10</b>
+          <span class="tag">👻</span> 5s pass-through, and from <b>level 10</b>
           <span class="tag">💣</span> clears the screen. They apply instantly.</li>
         <li>Pick a <b>Difficulty</b>, <b>Background</b>, and <b>Player</b> (use a
           photo as your bird) below the game.</li>
@@ -335,6 +335,8 @@
     // Power-up runtime state (solo only). pickups: floating collectibles;
     // lives: banked extra lives; invincibleUntil/flash: frame deadlines.
     let pickups = [], lives = 0, invincibleUntil = 0, flash = 0;
+    // Per-level spawn scheduling: one pickup per level at a random pipe.
+    let pickupLevel = 0, pickupWait = 0, pickupDone = false;
 
     const BACKGROUNDS = ["mountains", "clouds", "ocean"];
     let bg = localStorage.getItem("flappyBg");
@@ -478,7 +480,7 @@
     // swap which friend's picture represents each power-up.
     const POWERUPS = {
       life:   { file: "players/rev.png",   badge: "❤️", ring: "#ff5a7a", minLevel: 5,  banner: "❤️ Extra life!" },
-      undead: { file: "players/ausro.png", badge: "👻", ring: "#9fe3ff", minLevel: 5,  banner: "👻 Undead — 30s!" },
+      undead: { file: "players/ausro.png", badge: "👻", ring: "#9fe3ff", minLevel: 5,  banner: "👻 Undead — 5s!" },
       bomb:   { file: "players/jncae.png", badge: "💣", ring: "#ffb14d", minLevel: 10, banner: "💣 Boom! Pipes cleared!" },
     };
     // Preload the power-up photos (independent of PLAYERS); track load success so a
@@ -492,7 +494,7 @@
       img.src = cfg.file;
       cfg.img = img;
     }
-    const UNDEAD_FRAMES = 1800;   // 30s of pass-through invincibility @ ~60fps
+    const UNDEAD_FRAMES = 300;    // 5s of pass-through invincibility @ ~60fps
     const MERCY_FRAMES = 90;      // ~1.5s of invincibility after spending a life
     const MAX_LIVES = 3;
 
@@ -540,6 +542,9 @@
       lives = 0;
       invincibleUntil = 0;
       flash = 0;
+      pickupLevel = 0;
+      pickupWait = 0;
+      pickupDone = false;
     }
 
     function rand(a, b) {
@@ -547,19 +552,28 @@
     }
 
     // --- Power-ups (solo only) ---
-    // Maybe drop a pickup in the gap of the pipe just spawned. Types unlock by
-    // level (heart/undead from 5, bomb from 10) and are chosen at random.
+    // Drop at most one pickup per level, at a random pipe within the level, and
+    // never while a power-up is active (undead/mercy) or a pickup is on screen.
+    // Types unlock by level (heart/undead from 5, bomb from 10), chosen at random.
     function maybeSpawnPickup() {
       if (mp.online) return;
       const lvl = difficulty().level;
       if (lvl < POWERUPS.life.minLevel) return;
-      if (Math.random() > 0.15) return;            // ~1 in 7 pipes carries one
+      if (lvl !== pickupLevel) {                 // entered a new level → schedule one
+        pickupLevel = lvl;
+        pickupWait = Math.floor(rand(0, 4));     // 0..3 pipes of random delay
+        pickupDone = false;
+      }
+      if (pickupDone) return;                              // once per level
+      if (frame < invincibleUntil || pickups.length) return;  // no overlap with active effect / on-screen pickup
+      if (pickupWait > 0) { pickupWait--; return; }        // random timing within the level
       const p = pipes[pipes.length - 1];
       if (!p) return;
       const types = ["life", "undead"];
       if (lvl >= POWERUPS.bomb.minLevel) types.push("bomb");
       const type = types[Math.floor(Math.random() * types.length)];
       pickups.push({ x: p.x + p.w / 2, y: p.top + p.gap / 2, r: 13, type });
+      pickupDone = true;
     }
 
     // Apply a collected power-up immediately (no banking).

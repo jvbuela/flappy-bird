@@ -10,15 +10,24 @@ const CONFIG = {
   // Title text — each entry is one centered line. Use UPPERCASE (the built-in
   // font is uppercase). Allowed: A-Z 0-9 space & ! ? . , ' - :
   lines: [
-    { text: "PLAY FLAPPY BIRD", maxScale: 12, y: 44 },
-    { text: "WITH ROC NETWORK & FRIENDS", maxScale: 7, y: 172 },
+    { text: "PLAY FLAPPY BIRD", maxScale: 12, y: 36 },
+    { text: "WITH ROC NETWORK & FRIENDS", maxScale: 7, y: 158 },
+    { text: "NEW: POWER-UPS & NS/SS SHIFT", maxScale: 5, y: 226 },
   ],
   // Birds shown in the scene. photo: a path under the repo, or null = the
   // classic drawn yellow bird. r = radius.
   birds: [
-    { photo: "players/mlacu.png", x: 430, y: 392, r: 70 },
-    { photo: null,                x: 620, y: 446, r: 46 },
-    { photo: "players/jkdgu.png", x: 800, y: 392, r: 70 },
+    { photo: "players/mlacu.png", x: 440, y: 336, r: 58 },
+    { photo: null,                x: 600, y: 372, r: 40 },
+    { photo: "players/jkdgu.png", x: 760, y: 336, r: 58 },
+  ],
+  // Power-up pickups (friend faces) shown as a captioned row, each with its
+  // power-up theme ring colour.
+  powerupsCaption: { text: "POWER-UPS!", maxScale: 5, y: 414 },
+  powerups: [
+    { photo: "players/rev.png",   x: 490, y: 482, r: 30, ring: [255, 90, 122] },  // ❤️ life
+    { photo: "players/ausro.png", x: 600, y: 482, r: 30, ring: [159, 227, 255] }, // 👻 undead
+    { photo: "players/jncae.png", x: 710, y: 482, r: 30, ring: [255, 177, 77] },  // 💣 bomb
   ],
 };
 // ====================================================================
@@ -53,6 +62,7 @@ function ellipse(cx, cy, rx, ry, c) {
 function ring(cx, cy, r, c) {
   for (let a = 0; a < 360; a += 0.4) { const rad = a * Math.PI / 180; setpx(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r, c[0], c[1], c[2]); }
 }
+function thickRing(cx, cy, r, c, w) { for (let i = 0; i < (w || 3); i++) ring(cx, cy, r - i, c); }
 function tri(p, q, r, c) {
   const minX = Math.min(p[0], q[0], r[0]), maxX = Math.max(p[0], q[0], r[0]);
   const minY = Math.min(p[1], q[1], r[1]), maxY = Math.max(p[1], q[1], r[1]);
@@ -169,6 +179,13 @@ for (const bd of CONFIG.birds) {
   } else classicBird(bd.x, bd.y, bd.r);
 }
 
+// ---- power-up pickups (friend faces with themed rings) ----
+for (const pu of CONFIG.powerups || []) {
+  try { drawPhotoCircle(decodePNG(path.join(ROOT, pu.photo)), pu.x, pu.y, pu.r, pu.zoom, pu.fx, pu.fy); }
+  catch (e) { console.warn("powerup photo skipped:", pu.photo, e.message); disc(pu.x, pu.y, pu.r, [255, 255, 255]); }
+  thickRing(pu.x, pu.y, pu.r, pu.ring, 4);   // power-up theme colour ring
+}
+
 // ---- text (5x7 bitmap font) ----
 const FONT = {
   A: "01110 10001 10001 11111 10001 10001 10001", B: "11110 10001 11110 10001 10001 10001 11110",
@@ -193,6 +210,7 @@ const FONT = {
   "?": "01110 10001 00001 00010 00100 00000 00100", ".": "00000 00000 00000 00000 00000 00110 00110",
   ",": "00000 00000 00000 00000 00000 00100 01000", "'": "00100 00100 00000 00000 00000 00000 00000",
   "-": "00000 00000 00000 11111 00000 00000 00000", ":": "00000 00100 00100 00000 00100 00100 00000",
+  "/": "00001 00001 00010 00100 01000 10000 10000",
   " ": "00000 00000 00000 00000 00000 00000 00000",
 };
 function glyph(ch) { return (FONT[ch] || FONT[" "]).split(" "); }
@@ -206,12 +224,14 @@ function drawText(text, x, y, s, c) {
   }
 }
 function fitScale(text, maxW, maxS) { let s = maxS; while (s > 1 && textWidth(text, s) > maxW) s--; return s; }
-for (const ln of CONFIG.lines) {
+function drawCenteredLine(ln, color) {
   const s = fitScale(ln.text, W - 100, ln.maxScale || 12);
   const x = Math.round((W - textWidth(ln.text, s)) / 2);
   drawText(ln.text, x + Math.max(2, s * 0.4), ln.y + Math.max(2, s * 0.4), s, [40, 28, 36]); // shadow
-  drawText(ln.text, x, ln.y, s, [255, 255, 255]);
+  drawText(ln.text, x, ln.y, s, color || [255, 255, 255]);
 }
+for (const ln of CONFIG.lines) drawCenteredLine(ln);
+if (CONFIG.powerupsCaption) drawCenteredLine(CONFIG.powerupsCaption, [255, 235, 120]); // sunny caption
 
 // ---- PNG encode (RGB) ----
 const stride = 1 + W * 3, rawOut = Buffer.alloc(H * stride);

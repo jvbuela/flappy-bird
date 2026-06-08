@@ -123,15 +123,18 @@ Types:
 - ❤️ **Extra life** (from level 5) — banks a life (cap `MAX_LIVES` = 3). A fatal
   hit spends one via `loseOrDie`: clears the hit pipe (or bounces off the ground),
   grants ~1.5s mercy-invincibility (`MERCY_FRAMES`), and play continues.
-- 👻 **Undead** (from level 5) — `UNDEAD_FRAMES` (30s) of pass-through
+- 👻 **Undead** (from level 5) — `UNDEAD_FRAMES` (5s) of pass-through
   invincibility on pipes; bird glows and blinks as it expires. Ground/ceiling
   stay lethal.
 - 💣 **Bomb** (from level 10) — clears all on-screen pipes with a white `flash`.
 
-Gated behind `!mp.online`, so multiplayer races are unaffected. Spawned in the
-solo authority branch of `update` (`maybeSpawnPickup`, ~15%/pipe); collected in
-the scoring block (`applyPickup`); rendered by `drawPickups`. HUD shows banked
-❤️ lives and the 👻 countdown under the **LV** readout.
+Gated behind `!mp.online`, so multiplayer races are unaffected. **At most one
+pickup per level**, spawned at a random pipe within the level (`maybeSpawnPickup`
+in the solo authority branch of `update`, tracked via `pickupLevel`/`pickupWait`/
+`pickupDone`) — and never while a power-up is active (`invincibleUntil`) or a
+pickup is already on screen. Collected in the scoring block (`applyPickup`);
+rendered by `drawPickups`. HUD shows banked ❤️ lives and the 👻 countdown under
+the **LV** readout.
 
 ### 4.3 Difficulty modes (Easy / Medium / Hard)
 A vertical picker beside the canvas. Each mode scales the whole ramp via the
@@ -213,15 +216,19 @@ script (built-in `zlib` only) that:
 - renders customizable title text with a built-in bitmap font.
 
 **Customize the banner** by editing the `CONFIG` block at the top of
-`tools/make-og.js` (the `lines` text and which `birds`/photos appear), then run
-`node tools/make-og.js` to rewrite `og-image.png`, and commit. The current
-banner reads **"PLAY FLAPPY BIRD / WITH ROC NETWORK & FRIENDS"** with the
-`mlacu` and `jkdgu` photos.
+`tools/make-og.js` (the title `lines`, the `birds`/photos, and the captioned
+`powerups` row), then run `node tools/make-og.js` to rewrite `og-image.png`, and
+commit. The current banner reads **"PLAY FLAPPY BIRD / WITH ROC NETWORK &
+FRIENDS / NEW: POWER-UPS & NS/SS SHIFT"** with the `mlacu` and `jkdgu` player
+photos up top and a **"POWER-UPS!"** row of the three pickup faces
+(`rev`/`ausro`/`jncae`) each ringed in its power-up theme colour.
 
 The `og:image`/`og:url` are set to **absolute** URLs on
 `https://flappy-bird-ni-mark.vercel.app/` (Facebook/Messenger require absolute
-image URLs). After changing the banner, **re-scrape** the link in the Facebook
-Sharing Debugger so cached previews refresh.
+image URLs). The image URL carries a **`?v=N` cache-buster** (bump it whenever the
+banner changes) so platforms refetch instead of serving a stale image. After
+changing the banner, **re-scrape** the link in the Facebook Sharing Debugger
+(Messenger uses FB's cache) so cached previews refresh.
 
 ### 4.9 Online multiplayer ("ghost race")
 - **🌐 Multiplayer** button → lobby modal: enter a name, **Create room** (gets a
@@ -407,6 +414,7 @@ There's no automated test suite. Each change was checked by:
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 | `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
+| `_______` | Tune **power-up** spawning (at most one pickup per level at a random pipe via `pickupLevel`/`pickupWait`/`pickupDone`, never while a power-up is active or a pickup is on screen; 👻 undead 30s→5s) and refresh the **social link preview** (banner adds a captioned "POWER-UPS!" row of `rev`/`ausro`/`jncae` faces with theme rings + a "NEW: POWER-UPS & NS/SS SHIFT" tagline with a new `/` glyph; meta `description`s mention power-ups + NS/SS shift; `og:image`/`twitter:image` get a `?v=2` cache-buster) |
 | `8224130` | Add **power-ups** (solo): friend-photo pickups float in from level 5 — ❤️ extra life, 👻 30s undead, and 💣 (level 10) screen-clear; all apply instantly. Adds `POWERUPS` config (dedicated preloaded photos), `maybeSpawnPickup`/`applyPickup`/`loseOrDie`, shared `drawFaceMedallion`, lives/undead HUD; gated `!mp.online` so races are unaffected |
 | `b8e18f8` | Soften **Easy** mode: gentler steady state (`minGap` 140→150, `maxSpeed` 2.9→2.7, `speedRamp` .030→.024, `gapDrop` 1.0→0.8, `minSpacing` 200→210) and later hard mechanics (`moveAt` 14→18, `wideAt` 22→30); opening unchanged. Medium/Hard untouched |
 | `6959986` | Restyle photo skins as an "angel": replace the bat wings with ethereal soft-glow feathered wings (`drawFeatherWing` — covert + primary feather rows over a luminous bloom that brightens on each flap); also polish the Classic bird (gradient body, rim light, glossy eye, beak seam) |
