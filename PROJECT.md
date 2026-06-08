@@ -63,7 +63,8 @@ CodeTest2/
 ├── tools/
 │   └── make-og.js      # Regenerates og-image.png (pure Node, no deps)
 ├── backgrounds/
-│   └── office.jpg      # Photo background option (cover-fit into the canvas)
+│   ├── README.md       # How to add a photo background
+│   └── office.png      # Photo background option (cover-fit into the canvas)
 └── players/
     ├── README.md       # How to add a player photo
     ├── cliar.png       # Player photos (used as bird skins)
@@ -153,7 +154,7 @@ an **🏢 Office** photo option. Saved as `flappyBg`.
 `backgrounds/`), preloaded into `bgImages` with an `.ok` flag. `bgImage(key)`
 cover-fits (center-crops) the photo into the 400×600 canvas and gracefully falls
 back to the mountains scene if the image is missing/broken. The current entry is
-`office: "backgrounds/office.jpg"`; add more by dropping a file and extending
+`office: "backgrounds/office.png"`; add more by dropping a file and extending
 `BG_PHOTOS` + the `#bgPicker` buttons + `BACKGROUNDS`.
 
 A **🌙 Night** toggle (saved as `flappyNight`) turns on a combined dark theme:

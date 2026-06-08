@@ -5,7 +5,7 @@ Photo backgrounds for the game. Drop an image here and it's cover-fit
 
 ## How to add a photo background
 
-1. **Add an image** here, e.g. `backgrounds/office.jpg`.
+1. **Add an image** here, e.g. `backgrounds/office.png`.
    - Any size/orientation works (landscape is fine — it's center-cropped to the
      portrait canvas). Keep it web-sized (≤ ~500 KB) so it loads fast.
    - PNG or JPG.
@@ -13,7 +13,7 @@ Photo backgrounds for the game. Drop an image here and it's cover-fit
 
    ```js
    const BACKGROUNDS = ["mountains", "clouds", "ocean", "office"];   // add the name
-   const BG_PHOTOS = { office: "backgrounds/office.jpg" };           // name -> file
+   const BG_PHOTOS = { office: "backgrounds/office.png" };           // name -> file
    ```
 
 3. **Add a picker button** in the `#bgPicker` block of `../index.html`:
@@ -31,5 +31,5 @@ Notes:
   a dark overlay (the scene "at night"), instead of the starry night scene used by
   the drawn backgrounds.
 
-The currently-wired entry is **`office.jpg`** — just drop your office photo here
+The currently-wired entry is **`office.png`** — just drop your office photo here
 with that exact name and reload.
