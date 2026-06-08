@@ -386,7 +386,7 @@ There's no automated test suite. Each change was checked by:
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 | `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
-| `_______` | Restyle photo skins as an "angel": replace the bat wings with ethereal soft-glow feathered wings (`drawFeatherWing` — covert + primary feather rows over a luminous bloom that brightens on each flap); also polish the Classic bird (gradient body, rim light, glossy eye, beak seam) |
+| `6959986` | Restyle photo skins as an "angel": replace the bat wings with ethereal soft-glow feathered wings (`drawFeatherWing` — covert + primary feather rows over a luminous bloom that brightens on each flap); also polish the Classic bird (gradient body, rim light, glossy eye, beak seam) |
 
 ---
 
