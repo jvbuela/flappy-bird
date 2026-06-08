@@ -112,6 +112,27 @@ all values capped:
 - On-screen **LV** indicator + brief **unlock banners** ("↕ Moving pipes!",
   "▭ Wide pipes!", "⚡ Level n").
 
+### 4.2.1 Power-ups (solo only)
+Floating pickups that drift in with the pipes once you reach a level gate, drawn
+as **friend photos** (a circle-cropped `players/` face + a colour ring + a corner
+badge, via the shared `drawFaceMedallion` helper). All effects **apply instantly**
+on contact — no banking or extra keys. Configured in the `POWERUPS` map
+(`type -> { file, badge, ring, minLevel, banner }`), each with its own dedicated
+photo preloaded independently of `PLAYERS` (with a `.ok` fallback to a badge disc).
+Types:
+- ❤️ **Extra life** (from level 5) — banks a life (cap `MAX_LIVES` = 3). A fatal
+  hit spends one via `loseOrDie`: clears the hit pipe (or bounces off the ground),
+  grants ~1.5s mercy-invincibility (`MERCY_FRAMES`), and play continues.
+- 👻 **Undead** (from level 5) — `UNDEAD_FRAMES` (30s) of pass-through
+  invincibility on pipes; bird glows and blinks as it expires. Ground/ceiling
+  stay lethal.
+- 💣 **Bomb** (from level 10) — clears all on-screen pipes with a white `flash`.
+
+Gated behind `!mp.online`, so multiplayer races are unaffected. Spawned in the
+solo authority branch of `update` (`maybeSpawnPickup`, ~15%/pipe); collected in
+the scoring block (`applyPickup`); rendered by `drawPickups`. HUD shows banked
+❤️ lives and the 👻 countdown under the **LV** readout.
+
 ### 4.3 Difficulty modes (Easy / Medium / Hard)
 A vertical picker beside the canvas. Each mode scales the whole ramp via the
 `MODES` config (`gap`, `gapDrop`, `minGap`, `speed`, `speedRamp`, `maxSpeed`,
@@ -386,6 +407,7 @@ There's no automated test suite. Each change was checked by:
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 | `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
+| `_______` | Add **power-ups** (solo): friend-photo pickups float in from level 5 — ❤️ extra life, 👻 30s undead, and 💣 (level 10) screen-clear; all apply instantly. Adds `POWERUPS` config (dedicated preloaded photos), `maybeSpawnPickup`/`applyPickup`/`loseOrDie`, shared `drawFaceMedallion`, lives/undead HUD; gated `!mp.online` so races are unaffected |
 | `b8e18f8` | Soften **Easy** mode: gentler steady state (`minGap` 140→150, `maxSpeed` 2.9→2.7, `speedRamp` .030→.024, `gapDrop` 1.0→0.8, `minSpacing` 200→210) and later hard mechanics (`moveAt` 14→18, `wideAt` 22→30); opening unchanged. Medium/Hard untouched |
 | `6959986` | Restyle photo skins as an "angel": replace the bat wings with ethereal soft-glow feathered wings (`drawFeatherWing` — covert + primary feather rows over a luminous bloom that brightens on each flap); also polish the Classic bird (gradient body, rim light, glossy eye, beak seam) |
 
