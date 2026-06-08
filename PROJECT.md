@@ -62,6 +62,8 @@ CodeTest2/
 ├── .gitignore          # node_modules, .vercel, OS cruft
 ├── tools/
 │   └── make-og.js      # Regenerates og-image.png (pure Node, no deps)
+├── backgrounds/
+│   └── office.jpg      # Photo background option (cover-fit into the canvas)
 └── players/
     ├── README.md       # How to add a player photo
     ├── cliar.png       # Player photos (used as bird skins)
@@ -144,13 +146,21 @@ A vertical picker beside the canvas. Each mode scales the whole ramp via the
 
 ### 4.4 Backgrounds & night mode
 Picker for **mountains / clouds / ocean**, each drawn with canvas primitives
-(layered mountains + snow caps + sun; fluffy clouds; animated ocean waves).
-Saved as `flappyBg`.
+(layered mountains + snow caps + sun; fluffy clouds; animated ocean waves), plus
+an **🏢 Office** photo option. Saved as `flappyBg`.
+
+**Photo backgrounds** are configured in `BG_PHOTOS` (name → file under
+`backgrounds/`), preloaded into `bgImages` with an `.ok` flag. `bgImage(key)`
+cover-fits (center-crops) the photo into the 400×600 canvas and gracefully falls
+back to the mountains scene if the image is missing/broken. The current entry is
+`office: "backgrounds/office.jpg"`; add more by dropping a file and extending
+`BG_PHOTOS` + the `#bgPicker` buttons + `BACKGROUNDS`.
 
 A **🌙 Night** toggle (saved as `flappyNight`) turns on a combined dark theme:
-in-canvas it overrides the background with a starry night scene (`bgNight` — dark
-sky gradient, fixed star field `NIGHT_STARS`, glowing moon, mountain silhouette)
-and dims the ground; on the page it adds `body.dark`, darkening the chrome
+in-canvas it overrides the drawn backgrounds with a starry night scene (`bgNight`
+— dark sky gradient, fixed star field `NIGHT_STARS`, glowing moon, mountain
+silhouette) and dims the ground; **photo backgrounds instead stay visible with a
+translucent dark overlay** (the office "at night"). On the page it adds `body.dark`, darkening the chrome
 (background, buttons, modals, inputs) and updating the `theme-color` meta. The
 button label flips **🌙 NS Shift** (night) ↔ **☀️ SS Shift** (day);
 `applyTheme()` applies the saved state on load.
@@ -414,6 +424,7 @@ There's no automated test suite. Each change was checked by:
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 | `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
+| `_______` | Add an **🏢 Office photo background** option: `BG_PHOTOS`/`bgImages` preload + cover-fit `bgImage()` (falls back to mountains if the image is missing, dims at night); new picker button + `BACKGROUNDS` entry. Photo lives at `backgrounds/office.jpg` |
 | `f725104` | Tune **power-up** spawning (at most one pickup per level at a random pipe via `pickupLevel`/`pickupWait`/`pickupDone`, never while a power-up is active or a pickup is on screen; 👻 undead 30s→5s) and refresh the **social link preview** (banner adds a captioned "POWER-UPS!" row of `rev`/`ausro`/`jncae` faces with theme rings + a "NEW: POWER-UPS & NS/SS SHIFT" tagline with a new `/` glyph; meta `description`s mention power-ups + NS/SS shift; `og:image`/`twitter:image` get a `?v=2` cache-buster) |
 | `8224130` | Add **power-ups** (solo): friend-photo pickups float in from level 5 — ❤️ extra life, 👻 30s undead, and 💣 (level 10) screen-clear; all apply instantly. Adds `POWERUPS` config (dedicated preloaded photos), `maybeSpawnPickup`/`applyPickup`/`loseOrDie`, shared `drawFaceMedallion`, lives/undead HUD; gated `!mp.online` so races are unaffected |
 | `b8e18f8` | Soften **Easy** mode: gentler steady state (`minGap` 140→150, `maxSpeed` 2.9→2.7, `speedRamp` .030→.024, `gapDrop` 1.0→0.8, `minSpacing` 200→210) and later hard mechanics (`moveAt` 14→18, `wideAt` 22→30); opening unchanged. Medium/Hard untouched |

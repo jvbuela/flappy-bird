@@ -220,6 +220,7 @@
       <button data-bg="mountains">⛰️ Mountains</button>
       <button data-bg="clouds">☁️ Clouds</button>
       <button data-bg="ocean">🌊 Ocean</button>
+      <button data-bg="office">🏢 Office</button>
     </div>
     <div class="picker-label">Player</div>
     <div id="playerPicker" class="picker"></div>
@@ -338,7 +339,18 @@
     // Per-level spawn scheduling: one pickup per level at a random pipe.
     let pickupLevel = 0, pickupWait = 0, pickupDone = false;
 
-    const BACKGROUNDS = ["mountains", "clouds", "ocean"];
+    const BACKGROUNDS = ["mountains", "clouds", "ocean", "office"];
+    // Photo backgrounds: name -> file, cover-fit into the canvas. Preloaded with
+    // an `.ok` flag so a missing/broken image gracefully falls back to a scene.
+    const BG_PHOTOS = { office: "backgrounds/office.jpg" };
+    const bgImages = {};
+    for (const k in BG_PHOTOS) {
+      const img = new Image();
+      img.onload = () => { img.ok = true; };
+      img.onerror = () => { img.ok = false; };
+      img.src = BG_PHOTOS[k];
+      bgImages[k] = img;
+    }
     let bg = localStorage.getItem("flappyBg");
     if (!BACKGROUNDS.includes(bg)) bg = "mountains";
 
@@ -1259,7 +1271,19 @@
       ctx.fill();
     }
 
+    // A photo background, cover-fit (center-cropped) into the canvas. Falls back
+    // to a drawn scene if the image hasn't loaded; dims at night (NS shift).
+    function bgImage(key) {
+      const img = bgImages[key];
+      if (!img || !img.ok) { night ? bgNight() : bgMountains(); return; }
+      const scale = Math.max(W / img.width, H / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      if (night) { ctx.fillStyle = "rgba(8,14,38,0.55)"; ctx.fillRect(0, 0, W, H); }
+    }
+
     function drawBackground() {
+      if (bg === "office") { bgImage("office"); return; }  // photo (handles its own night dim)
       if (night) bgNight();
       else if (bg === "clouds") bgClouds();
       else if (bg === "ocean") bgOcean();
