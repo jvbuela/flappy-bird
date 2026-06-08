@@ -142,9 +142,11 @@ button label flips **🌙 NS Shift** (night) ↔ **☀️ SS Shift** (day);
   two-tone orange beak.
 - **Classic** uses a single feathered wing (`drawWing`, hinged at the shoulder)
   that flaps up on a tap and settles (`bird.wing` decays). **Photo skins render
-  as a "bat"**: the face medallion in the centre with **symmetric bat wings**
-  (`drawBatWing`, side = ∓1) drawn behind it, so the face is framed (never
-  covered) and the wings flap together with `bird.wing`.
+  as an "angel"**: the face medallion in the centre with **symmetric feathered
+  wings** (`drawFeatherWing`, side = ∓1) drawn behind it — layered pearl-white
+  feathers (a covert row over a fanned primary row) over a faint luminous bloom,
+  so the wings look softly backlit. The face is framed (never covered) and the
+  wings flap together with `bird.wing` (the glow brightens slightly on a flap).
 - Graceful fallback: a missing/broken image silently reverts to the Classic
   bird (`p.ok` tracks load success). Saved as `flappyPlayer`.
 - **To add a player:** drop an image in `players/` and add a line to `PLAYERS`
@@ -384,6 +386,7 @@ There's no automated test suite. Each change was checked by:
 | `93b9fdd` | Restyle photo skins as a "bat": face medallion with symmetric bat wings (`drawBatWing`); Classic stays a bird |
 | `34705ae` | Add synthesized cartoon sound effects (flap whoosh, score blip, falling scream, 3-2-1-GO beeps) with a 🔊 toggle (`flappySound`); Web Audio, no files |
 | `222fe9f` | Move the action buttons (Multiplayer/Help/Night/Sound) into a right-side panel flanking the canvas, balancing the Difficulty panel on the left |
+| `_______` | Restyle photo skins as an "angel": replace the bat wings with ethereal soft-glow feathered wings (`drawFeatherWing` — covert + primary feather rows over a luminous bloom that brightens on each flap); also polish the Classic bird (gradient body, rim light, glossy eye, beak seam) |
 
 ---
 

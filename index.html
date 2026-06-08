@@ -692,39 +692,89 @@
       ctx.save();
       ctx.translate(-3 + ox, 1 + oy);       // shoulder, slightly behind/below centre
       ctx.rotate(-0.5 - wing * 1.2);        // sweeps upward as the bird flaps
-      ctx.fillStyle = "#fff";
       ctx.strokeStyle = "#553847";
       ctx.lineWidth = 2;
+      // base feather layer (warm cream) — the underside of the wing
+      ctx.fillStyle = "#ffe9c2";
       ctx.beginPath();
-      ctx.ellipse(-8, 0, 11, 6, 0, 0, Math.PI * 2);   // extends back from the shoulder
+      ctx.ellipse(-9, 1, 12, 6.5, 0, 0, Math.PI * 2);   // extends back from the shoulder
       ctx.fill();
       ctx.stroke();
-      // feather crease
+      // top feather layer (white), offset back for a layered, plumed look
+      ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.moveTo(-2, -1);
-      ctx.lineTo(-15, 0);
+      ctx.ellipse(-9, -1.5, 10, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // feather creases
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-2, -1);  ctx.lineTo(-16, -1);
+      ctx.moveTo(-3, 1.5); ctx.lineTo(-15, 2);
       ctx.stroke();
       ctx.restore();
     }
 
-    // A bat wing for photo skins. side = -1 (left) / +1 (right); flaps with wing.
-    function drawBatWing(side, wing) {
+    // A feathered "angel" wing for photo skins. side = -1 (left) / +1 (right);
+    // flaps with wing. Ethereal soft-glow look: layered pearl-white feathers
+    // over a faint luminous bloom, framing (never covering) the face.
+    function drawFeatherWing(side, wing) {
       ctx.save();
       ctx.scale(side, 1);            // mirror for the left wing
-      ctx.translate(BIRD_R - 4, 0);  // shoulder at the body edge
-      ctx.rotate(-wing * 0.4);       // sweep up on a flap
-      ctx.fillStyle = "#2f2a3d";     // dark membrane
-      ctx.strokeStyle = "#1a1722";
-      ctx.lineWidth = 1.5;
+      ctx.translate(BIRD_R - 5, 0);  // shoulder at the body edge
+      ctx.rotate(-wing * 0.5);       // sweep up on a flap
+      ctx.scale(1.45, 1.45);         // overall wingspan (grows outward from the shoulder)
+
+      // Soft luminous bloom behind the feathers — a backlit halo that brightens
+      // a touch on each flap. Drawn first (and behind the opaque face medallion),
+      // so it only ever shows as a faint glow around/beyond the wing edge.
+      const glow = ctx.createRadialGradient(13, -7, 1, 13, -7, 16);
+      const ga = 0.28 + wing * 0.22;
+      glow.addColorStop(0, "rgba(255,255,255," + ga + ")");
+      glow.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.moveTo(0, -6);
-      ctx.lineTo(18, -12);                 // leading arm → wingtip
-      ctx.quadraticCurveTo(12, -2, 16, 2); // scallop → finger 1
-      ctx.quadraticCurveTo(9, 4, 11, 9);   // scallop → finger 2
-      ctx.quadraticCurveTo(5, 7, 0, 8);    // trailing edge back to shoulder
-      ctx.closePath();
+      ctx.ellipse(13, -7, 16, 14, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
+
+      // A single tapered feather from the shoulder origin: out along angle `a`,
+      // length L, half-width w. Pointed tip, rounded base.
+      ctx.strokeStyle = "rgba(201,207,219,0.8)";
+      ctx.lineWidth = 1;
+      const feather = (a, L, w, fill) => {
+        ctx.save();
+        ctx.rotate(a);
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(L * 0.5, -w, L, 0);   // upper edge → tip
+        ctx.quadraticCurveTo(L * 0.5, w, 0, 0);    // lower edge → base
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      // Primary row: 5 feathers fanning up-and-back, longest at the back,
+      // brightening from a cool pearl underside to pure white at the front.
+      const primaries = [
+        { a: -1.15, L: 12.5, w: 3,   fill: "#d8dfee" },
+        { a: -0.90, L: 14,   w: 3.2, fill: "#e7ecf6" },
+        { a: -0.62, L: 15,   w: 3.3, fill: "#f3f6fb" },
+        { a: -0.36, L: 15.5, w: 3.3, fill: "#ffffff" },
+        { a: -0.12, L: 16,   w: 3,   fill: "#ffffff" },
+      ];
+      for (const f of primaries) feather(f.a, f.L, f.w, f.fill);
+
+      // Covert row: short, more upright feathers over the primary bases for
+      // plumage depth near the shoulder.
+      const coverts = [
+        { a: -0.95, L: 8,   w: 2.6, fill: "#ffffff" },
+        { a: -0.62, L: 8.5, w: 2.8, fill: "#ffffff" },
+        { a: -0.32, L: 8,   w: 2.6, fill: "#ffffff" },
+      ];
+      for (const f of coverts) feather(f.a, f.L, f.w, f.fill);
+
       ctx.restore();
     }
 
@@ -751,10 +801,10 @@
 
       const usePhoto = plr && plr.file && plr.ok && plr.img;
       if (usePhoto) {
-        // Photo skin = a "bat": symmetric bat wings behind the face medallion,
-        // then the circle-cropped face and outline on top.
-        drawBatWing(-1, wing);
-        drawBatWing(1, wing);
+        // Photo skin = an "angel": symmetric feathered wings behind the face
+        // medallion, then the circle-cropped face and outline on top.
+        drawFeatherWing(-1, wing);
+        drawFeatherWing(1, wing);
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
@@ -773,16 +823,37 @@
         ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        // Classic drawn bird (fallback / default): oval body, belly, wing, eye, beak.
-        ctx.fillStyle = "#f7c531";
+        // Classic drawn bird (fallback / default): polished modern look —
+        // gradient body, soft shadow, rim light, gradient belly, glossy eye,
+        // layered wing, crisp two-tone beak.
+        // soft ground shadow (low translucent ellipse under the bird)
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.beginPath();
+        ctx.ellipse(0, BIRD_R + 2, BIRD_R - 1, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // body — vertical gradient for volume
+        const bodyGrad = ctx.createLinearGradient(0, -BIRD_R, 0, BIRD_R);
+        bodyGrad.addColorStop(0, "#ffe07a");
+        bodyGrad.addColorStop(0.5, "#f7c531");
+        bodyGrad.addColorStop(1, "#eaa41c");
+        ctx.fillStyle = bodyGrad;
         ctx.strokeStyle = "#553847";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.ellipse(0, 0, BIRD_R + 1, BIRD_R, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        // white belly
-        ctx.fillStyle = "#fff7e6";
+        // rim light along the upper-left edge
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, BIRD_R - 1, BIRD_R - 2, 0, Math.PI * 0.85, Math.PI * 1.55);
+        ctx.stroke();
+        // belly — faint top-down gradient so it reads round, not like a sticker
+        const bellyGrad = ctx.createLinearGradient(0, 0, 0, 11);
+        bellyGrad.addColorStop(0, "#fffdf6");
+        bellyGrad.addColorStop(1, "#ffe9c2");
+        ctx.fillStyle = bellyGrad;
         ctx.beginPath();
         ctx.ellipse(-1, 5, BIRD_R - 4, BIRD_R - 6, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -799,6 +870,11 @@
         ctx.fillStyle = "#000";
         ctx.beginPath();
         ctx.arc(8.5, -5, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        // glossy specular highlight on the pupil
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(7.6, -6, 1.1, 0, Math.PI * 2);
         ctx.fill();
         // two-tone beak
         ctx.strokeStyle = "#553847";
@@ -818,6 +894,13 @@
         ctx.lineTo(BIRD_R - 3, 5);
         ctx.closePath();
         ctx.fill();
+        ctx.stroke();
+        // beak seam where the two halves meet
+        ctx.strokeStyle = "rgba(85,56,71,0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(BIRD_R - 3, 1);
+        ctx.lineTo(BIRD_R + 9, -1);
         ctx.stroke();
       }
       ctx.restore();
